@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Autod</title>
+<meta name="theme-color" content="#1f2933">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Autod">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="day">
+<header id="top">
+  <div id="clock"></div>
+  <div class="top-buttons">
+    <button id="btnTheme" class="iconbtn" aria-label="Öö/päev">🌙</button>
+    <button id="btnHistory" class="iconbtn" aria-label="Ajalugu">🕘</button>
+    <button id="btnSettings" class="iconbtn" aria-label="Seaded">⚙</button>
+  </div>
+</header>
+<main id="grid"></main>
+<div id="overlay" class="hidden"></div>
+<div id="sleep" class="hidden"></div>
+<video id="cam" playsinline muted autoplay></video>
+<canvas id="camCanvas" width="32" height="24"></canvas>
+<script src="app.js"></script>
+</body>
+</html>

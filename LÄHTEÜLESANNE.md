@@ -108,8 +108,8 @@ inimeste nimekiri, poolpäevade kellaajad (eeldus: hommik 00–12, õhtu 12–24
 | # | Kuupäev | Ülesanne | Staatus |
 |---|---------|----------|---------|
 | 1 | 2026-11-21 | Projekt loodud | tehtud |
-| 2 | 2026-11-21 | Pealeht: sõidukite ruudustik, klikk → täisekraani nimevalik → ruut punaseks + nimi | ootab luba |
-| 3 | 2026-11-21 | Broneerimine; 1 päev enne algust ruut kollaseks | ootab luba |
-| 4 | 2026-11-21 | Tagastamisel küsimus ees/taga parklas; ruudule täht E või T | ootab luba |
-| 5 | 2026-11-21 | Tagastamisel ikoonid "klaasipesuvedelik otsas", "kütust vähe" | ootab luba |
-| 6 | 2026-11-21 | Öö/päeva vaade (kellaaeg / ruumi valgus kaameraga); esikaamera liikumisandurina (ekraani uinumine/ärkamine); toetus vanadele seadmetele | ootab luba |
+| 2 | 2026-11-21 | Pealeht: sõidukite ruudustik, klikk → täisekraani nimevalik → ruut punaseks + nimi | tehtud v0.1.0 (testimisel) |
+| 3 | 2026-11-21 | Broneerimine; 1 päev enne algust ruut kollaseks | tehtud v0.1.0 (testimisel) |
+| 4 | 2026-11-21 | Tagastamisel küsimus ees/taga parklas; ruudule täht E või T | tehtud v0.1.0 (testimisel) |
+| 5 | 2026-11-21 | Tagastamisel ikoonid "klaasipesuvedelik otsas", "kütust vähe" | tehtud v0.1.0 (testimisel) |
+| 6 | 2026-11-21 | Öö/päeva vaade (kellaaeg / ruumi valgus kaameraga); esikaamera liikumisandurina (ekraani uinumine/ärkamine); toetus vanadele seadmetele | tehtud v0.1.0 (testimisel) |
