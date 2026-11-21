@@ -26,4 +26,4 @@ Andmed on ainult selles seadmes (localStorage). Varukoopia: ⚙ → Ekspordi / I
 - Virtuaalne Android-tahvel (WSL): `bash tools/start_emulator.sh`
   (esimesel korral `sudo chmod 666 /dev/kvm`). AVD `Tahvel_test`, Android 14 + Chrome, emuleeritud esikaamera.
 - Ikoonid: `python3 tools/make_icons.py icons`
-- Uue versiooni avaldamisel muuda `VERSION` (app.js) ja `CACHE` (sw.js).
+- Uue versiooni avaldamisel muuda `VERSION` (app.js) ja `CACHE` (sw.js). Service worker on "võrk enne": Wi-Fi-s tõmbab alati uue, offline kasutab vahemälu.

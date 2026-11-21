@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.1.1';
+  var VERSION = '0.1.4';
   var KEY = 'autoapp.v1';
   var DAY_MS = 24 * 3600 * 1000;
   var WEEKDAYS = ['P', 'E', 'T', 'K', 'N', 'R', 'L'];
@@ -101,12 +101,12 @@
 
   // ---------- Armatuurlaua ikoonid (SVG) ----------
   var ICONS = {
-    // klaasipesuvedelik: tuuleklaas + pritsiv juga (ISO 2575 stiil)
-    washer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="M2.5 7.5 Q12 3 21.5 7.5 L19.5 20 H4.5 Z"/>' +
-      '<path d="M12 19 V13" stroke-dasharray="1.6 1.9"/>' +
-      '<path d="M12 19 Q11.5 13 7 10.5" stroke-dasharray="1.6 1.9"/>' +
-      '<path d="M12 19 Q12.5 13 17 10.5" stroke-dasharray="1.6 1.9"/></svg>',
+    // klaasipesuvedelik: tuuleklaas + keskel punktiirjoon + kaks kaarduvat juga
+    washer: '<svg viewBox="15 10 270 220" fill="none" stroke="currentColor" stroke-width="15" stroke-linejoin="round">' +
+      '<path d="M30 130 Q150 55 270 130 L192 212 Q150 188 108 212 Z"/>' +
+      '<path d="M150 200 V55" stroke-dasharray="24 14"/>' +
+      '<path d="M150 58 C150 22 82 20 82 72" stroke-dasharray="20 12"/>' +
+      '<path d="M150 58 C150 22 218 20 218 72" stroke-dasharray="20 12"/></svg>',
     // kütus: tanur
     fuel: '<svg viewBox="0 0 24 24" fill="currentColor">' +
       '<path fill-rule="evenodd" d="M4 4.5 A1.5 1.5 0 0 1 5.5 3 H12.5 A1.5 1.5 0 0 1 14 4.5 V20 H4 Z M6 5.5 V10 H12 V5.5 Z"/>' +
@@ -122,7 +122,7 @@
   function render() {
     purgeBookings();
     var html = '';
-    var n = db.cars.length, cls = n <= 4 ? 'cols2' : (n >= 10 ? 'cols4' : '');
+    var n = db.cars.length, cls = '';
     if (!n) html = '<div class="empty">Sõidukeid pole. Lisa need seadetes ⚙.</div>';
     db.cars.forEach(function (c) {
       var sb = soonBooking(c.id), state = c.user ? 'red' : (sb ? 'yellow' : 'green');
@@ -140,7 +140,30 @@
       html += '</div>';
     });
     grid.innerHTML = html;
+    fitTiles();
   }
+  // Kõik ruudud mahuvad ekraanile ilma kerimiseta: vali veergude arv, mis annab suurimad ruudud
+  function fitTiles() {
+    var tiles = grid.querySelectorAll('.tile'), n = tiles.length;
+    if (!n) return;
+    var W = grid.clientWidth - 16, H = grid.clientHeight - 16, M = 16; // grid padding 8 + tile margin 8
+    var best = null;
+    for (var cols = 1; cols <= n; cols++) {
+      var rows = Math.ceil(n / cols), w = W / cols - M, h = H / rows - M;
+      if (w <= 0 || h <= 0) continue;
+      var score = Math.min(w / 1.5, h); // eelistab ~3:2 ruute
+      if (!best || score > best.score) best = { score: score, w: w, h: h };
+    }
+    if (!best) return;
+    var fs = Math.max(16, Math.min(best.h * 0.17, best.w * 0.11, 48));
+    for (var i = 0; i < n; i++) {
+      var st = tiles[i].style;
+      st.width = Math.floor(best.w) + 'px'; st.height = Math.floor(best.h) + 'px';
+      st.minHeight = '0'; st.fontSize = Math.round(fs) + 'px';
+    }
+  }
+  window.addEventListener('resize', fitTiles);
+  window.addEventListener('orientationchange', function () { setTimeout(fitTiles, 300); });
   function sameDay(t) { return ymd(new Date(t)) === ymd(new Date()); }
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
@@ -189,7 +212,7 @@
     if (sb) h += '<p class="info">📅 Broneeritud: <b>' + esc(sb.person) + '</b>, ' + bookingLabel(sb) + '</p>';
     else h += '<p class="info">Auto on parklas: <b>' + (car.spot === 'E' ? 'ees' : 'taga') + '</b></p>';
     if (!db.people.length) h += '<p class="info">Inimesi pole. Lisa need seadetes ⚙.</p>';
-    h += '<div class="btngrid">';
+    h += '<div class="btngrid' + (db.people.length > 12 ? ' dense' : '') + '">';
     db.people.forEach(function (p, i) {
       h += '<button data-p="' + i + '"' + (sb && sb.person === p ? ' class="booker"' : '') + '>' + esc(p) + '</button>';
     });
@@ -265,7 +288,7 @@
 
   // Broneerimine: 1) nimi 2) päevad × hommik/õhtu
   function showBookPerson(car) {
-    var h = '<h2>' + esc(car.name) + ' – kes broneerib?</h2><div class="btngrid">';
+    var h = '<h2>' + esc(car.name) + ' – kes broneerib?</h2><div class="btngrid' + (db.people.length > 12 ? ' dense' : '') + '">';
     db.people.forEach(function (p, i) { h += '<button data-p="' + i + '">' + esc(p) + '</button>'; });
     h += '</div><div class="actions"><button data-a="back">Tagasi</button></div>';
     var d = openDialog(h);

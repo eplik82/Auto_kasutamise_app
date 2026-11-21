@@ -49,11 +49,12 @@ button:disabled { opacity: .35; }
 .tile.cols4 { width: calc(25% - 16px); }
 .tile.yellow { background: var(--yellow); color: var(--yellow-fg); }
 .tile.red { background: var(--red); color: var(--red-fg); }
-.tile .name { font-size: 34px; font-weight: 700; line-height: 1.1; word-break: break-word; }
-.tile .who { font-size: 26px; margin-top: 10px; font-weight: 600; }
-.tile .sub { font-size: 17px; margin-top: 4px; opacity: .9; }
+.tile { overflow: hidden; }
+.tile .name { font-size: 1em; font-weight: 700; line-height: 1.1; word-break: break-word; }
+.tile .who { font-size: .75em; margin-top: 10px; font-weight: 600; }
+.tile .sub { font-size: .5em; margin-top: 4px; opacity: .9; }
 .tile .spot {
-  position: absolute; top: 10px; right: 14px; font-size: 44px; font-weight: 800; line-height: 1;
+  position: absolute; top: 10px; right: 14px; font-size: 1.3em; font-weight: 800; line-height: 1;
 }
 .tile .flags { position: absolute; bottom: 10px; left: 12px; }
 /* armatuurlaua hoiatustuli: merevaigukollane sümbol mustal */
@@ -61,7 +62,7 @@ button:disabled { opacity: .35; }
   background: #111; color: #ffb000; vertical-align: middle; box-shadow: 0 0 0 2px rgba(255,255,255,.25); }
 .lamp svg, .toggle svg { width: 100%; height: 100%; display: block; }
 .hist .lamp { width: 30px; height: 30px; padding: 4px; border-radius: 6px; }
-.tile .note { position: absolute; bottom: 10px; right: 14px; font-size: 15px; opacity: .95; }
+.tile .note { position: absolute; bottom: 10px; right: 14px; font-size: .45em; opacity: .95; }
 .empty { padding: 40px; font-size: 22px; color: var(--muted); }
 
 /* Ülekate (hõljukaken üle ekraani) */
@@ -80,9 +81,12 @@ button:disabled { opacity: .35; }
 .dialog p.info { margin: 4px 0 14px; color: var(--muted); font-size: 18px; }
 .btngrid { display: flex; flex-wrap: wrap; margin: 0 -6px; }
 .btngrid button { margin: 6px; min-height: 84px; font-size: 26px; font-weight: 600; width: calc(25% - 12px); }
+.btngrid.dense button { width: calc(20% - 12px); min-height: 64px; font-size: 22px; }
 .btngrid.two button { width: calc(50% - 12px); min-height: 120px; font-size: 32px; }
 .btngrid button.sel { background: var(--accent); color: #fff; }
 .btngrid button.booker { outline: 4px solid var(--yellow); }
+.dialog > .actions { position: -webkit-sticky; position: sticky; bottom: -22px; background: var(--panel);
+  margin: 18px -22px -22px; padding: 12px 22px 22px; border-top: 1px solid var(--line); }
 .actions { display: flex; justify-content: flex-end; flex-wrap: wrap; margin-top: 18px; }
 .actions button { margin-left: 10px; margin-top: 6px; padding: 0 26px; height: 64px; font-size: 22px; font-weight: 600; }
 .actions .left { margin-right: auto; margin-left: 0; }
@@ -95,9 +99,9 @@ button.warn { background: var(--yellow); color: var(--yellow-fg); }
 .toggle.on { background: #111; color: #ffb000; box-shadow: 0 0 0 4px #ffb000 inset; }
 
 /* Broneerimise päevade tabel */
-.days { width: 100%; border-collapse: collapse; }
+.days { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .days td { padding: 5px; border-bottom: 1px solid var(--line); font-size: 20px; }
-.days td.d { width: 30%; font-weight: 600; }
+.days td.d { width: 26%; font-weight: 600; }
 .days button { width: 100%; height: 60px; font-size: 20px; }
 .days button.sel { background: var(--accent); color: #fff; }
 .days button.taken { background: var(--yellow); color: var(--yellow-fg); opacity: .8; }
@@ -132,10 +136,11 @@ button.warn { background: var(--yellow); color: var(--yellow-fg); }
 
 @media (max-width: 900px) {
   .tile, .tile.cols4 { width: calc(50% - 16px); }
-  .btngrid button { width: calc(33.333% - 12px); }
+  .btngrid button, .btngrid.dense button { width: calc(33.333% - 12px); }
 }
 @media (max-width: 560px) {
   .tile, .tile.cols2, .tile.cols4 { width: calc(100% - 16px); min-height: 140px; }
-  .btngrid button { width: calc(50% - 12px); }
+  .btngrid button, .btngrid.dense button { width: calc(50% - 12px); }
   .form-row label { width: 100%; }
 }
+.tile .lamp { width: 1.4em; height: 1.4em; padding: .18em; border-radius: .3em; }
