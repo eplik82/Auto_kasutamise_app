@@ -135,3 +135,4 @@ inimeste nimekiri, poolpäevade kellaajad (eeldus: hommik 00–12, õhtu 12–24
 | 17 | 2026-11-21 | Parandus: kui brauser täisekraani ei luba, ei neela app enam kõiki puudutusi | tehtud v0.3.0 |
 | 18 | 2026-11-21 | Hooldus: kellaaeg (algus/lõpp kuupäev+kell) + kommentaar; 24 h enne algust kollane 🔧 hoiatus ruudul; hoolduse ajal hall; Muuda/Tühista; vanad poolpäeva-hooldused teisendatakse | tehtud v0.4.0 |
 | 19 | 2026-11-21 | Kuupäeva formaat pp.kk.aaaa + 24 h kell (oma valikud, mitte seadme keelest sõltuvad date/time väljad); kesköö lõpp = "24:00" | tehtud v0.4.1 |
+| 20 | 2026-11-21 | Viga: hoolduse "Muuda" kommentaar ei salvestunud (klaviatuuri sulgumisel aken hüppas, "Salvesta" puudutus tabas tausta → aken sulgus). Parandus: vormiaknad ülaserva ankurdatud, taust ei sulge vormi, Enter salvestab | tehtud v0.4.2 |

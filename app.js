@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.4.1';
+  var VERSION = '0.4.2';
   var KEY = 'autoapp.v1';
   var DAY_MS = 24 * 3600 * 1000;
   var WEEKDAYS = ['P', 'E', 'T', 'K', 'N', 'R', 'L'];
@@ -261,7 +261,9 @@
   var onClose = null;
   function openDialog(html, small) {
     overlay.innerHTML = '<div class="dialog' + (small ? ' small' : '') + '">' + html + '</div>';
-    overlay.classList.remove('hidden');
+    // Vormiga aken: ülaserva ankurdatud (klaviatuur ei liiguta seda) ja taustale puudutus ei sulge
+    // (muidu klaviatuuri sulgumisel hüppab aken ja "Salvesta" puudutus tabab tausta → andmed kaovad).
+    overlay.className = overlay.firstChild.querySelector('input, select, textarea') ? 'form' : '';
     return overlay.firstChild;
   }
   function closeDialog() {
@@ -269,7 +271,11 @@
     var f = onClose; onClose = null; if (f) f();
     render();
   }
-  overlay.addEventListener('click', function (e) { if (e.target === overlay) closeDialog(); });
+  overlay.addEventListener('click', function (e) {
+    if (e.target !== overlay) return;
+    if (/\bform\b/.test(overlay.className)) { var a = document.activeElement; if (a && a.blur) a.blur(); return; }
+    closeDialog();
+  });
   function on(root, sel, ev, fn) {
     var els = root.querySelectorAll(sel);
     for (var i = 0; i < els.length; i++) els[i].addEventListener(ev, fn);
@@ -494,6 +500,7 @@
       '<p class="info">24 h enne algust läheb ruut kollaseks (🔧 hoiatus), hoolduse ajal on ruut hall.</p>' +
       '<div class="actions"><button data-a="back">Tagasi</button><button class="primary" data-a="ok">Salvesta hooldus</button></div>';
     var d = openDialog(h);
+    d.querySelector('#cm').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); this.blur(); d.querySelector('[data-a=ok]').click(); } });
     // kui algus nihkub lõpust hilisemaks, nihuta lõpp samale päevale (sama kestusega kui võimalik)
     on(d, '#ps select', 'change', function () {
       var a = readPicker(d, 'ps'), b = readPicker(d, 'pe');

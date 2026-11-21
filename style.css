@@ -203,3 +203,7 @@ button.bigadd { height: 60px; padding: 0 26px; font-size: 20px; font-weight: 600
   background: var(--bg); color: var(--fg); -webkit-appearance: none; appearance: none; text-align: center; min-width: 56px; }
 .dtp select[data-p=y] { min-width: 86px; }
 .gap { display: inline-block; width: 18px; text-align: center; }
+
+/* vormiga aken ülaservas, et ekraaniklaviatuur seda ei nihutaks */
+#overlay.form { align-items: flex-start; padding-top: 2vh; }
+#overlay.form .dialog { max-height: 96%; }
