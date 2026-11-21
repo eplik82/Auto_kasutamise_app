@@ -15,7 +15,7 @@ Spetsifikatsioon: [`LÄHTEÜLESANNE.md`](LÄHTEÜLESANNE.md). Versioon: 0.2.0.
 - **🕘** ajalugu, **☀/🌙** öö/päev, **⚙** seaded (sõidukid, inimesed, öörežiim, liikumisandur, PIN, varukoopia).
 
 ## Paigaldamine seadmesse
-1. Seade Wi-Fi-sse, ava app'i HTTPS-aadress (GitHub Pages).
+1. Seade Wi-Fi-sse, ava **https://eplik82.github.io/Auto_kasutamise_app/**
 2. **iPad:** Safari → Jaga ⬆ → *Lisa avakuvale*. **Android:** Chrome → ⋮ → *Installi / Lisa avakuvale*.
 3. Ava avakuvalt, luba kaamera (liikumisandur). Edaspidi töötab ilma internetita.
 4. Seinatahvlil: iPad *Seaded → Ekraan → Automaatlukk → Mitte kunagi* (+ soovitavalt *Juurdepääs → Juhendatud
