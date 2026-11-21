@@ -1,6 +1,6 @@
 /* Service worker – kõik failid seadme vahemällu, töötab ilma internetita.
  * Uue versiooni avaldamisel muuda CACHE nime. */
-var CACHE = 'autoapp-0.1.0';
+var CACHE = 'autoapp-0.1.1';
 var FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 

@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.1.0';
+  var VERSION = '0.1.1';
   var KEY = 'autoapp.v1';
   var DAY_MS = 24 * 3600 * 1000;
   var WEEKDAYS = ['P', 'E', 'T', 'K', 'N', 'R', 'L'];
@@ -99,6 +99,24 @@
     return null;
   }
 
+  // ---------- Armatuurlaua ikoonid (SVG) ----------
+  var ICONS = {
+    // klaasipesuvedelik: tuuleklaas + pritsiv juga (ISO 2575 stiil)
+    washer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M2.5 7.5 Q12 3 21.5 7.5 L19.5 20 H4.5 Z"/>' +
+      '<path d="M12 19 V13" stroke-dasharray="1.6 1.9"/>' +
+      '<path d="M12 19 Q11.5 13 7 10.5" stroke-dasharray="1.6 1.9"/>' +
+      '<path d="M12 19 Q12.5 13 17 10.5" stroke-dasharray="1.6 1.9"/></svg>',
+    // kütus: tanur
+    fuel: '<svg viewBox="0 0 24 24" fill="currentColor">' +
+      '<path fill-rule="evenodd" d="M4 4.5 A1.5 1.5 0 0 1 5.5 3 H12.5 A1.5 1.5 0 0 1 14 4.5 V20 H4 Z M6 5.5 V10 H12 V5.5 Z"/>' +
+      '<rect x="2.5" y="20" width="13" height="2" rx=".5"/>' +
+      '<path d="M14 9 H15.5 A1.5 1.5 0 0 1 17 10.5 V16.5 A1.5 1.5 0 0 0 20 16.5 V8.5 L17.5 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  };
+  var ICON_TITLE = { washer: 'Klaasipesuvedelik otsas', fuel: 'Kütust vähe' };
+  function lamp(name) { return '<span class="lamp" title="' + ICON_TITLE[name] + '">' + ICONS[name] + '</span>'; }
+  function lamps(o) { return (o.washer ? lamp('washer') : '') + (o.fuel ? lamp('fuel') : ''); }
+
   // ---------- Pealeht ----------
   var grid = document.getElementById('grid');
   function render() {
@@ -108,7 +126,7 @@
     if (!n) html = '<div class="empty">Sõidukeid pole. Lisa need seadetes ⚙.</div>';
     db.cars.forEach(function (c) {
       var sb = soonBooking(c.id), state = c.user ? 'red' : (sb ? 'yellow' : 'green');
-      var flags = (c.washer ? '🧴' : '') + (c.fuel ? '⛽' : '');
+      var flags = lamps(c);
       html += '<div class="tile ' + state + ' ' + cls + '" data-id="' + c.id + '">';
       if (state !== 'red') html += '<div class="spot">' + c.spot + '</div>';
       html += '<div class="name">' + esc(c.name) + '</div>';
@@ -221,8 +239,8 @@
       '<h3>Kuhu parkisid?</h3><div class="btngrid two">' +
       '<button data-s="E">Ees (E)</button><button data-s="T">Taga (T)</button></div>' +
       '<h3>Märkused</h3><div class="btngrid two">' +
-      '<button class="toggle" data-f="washer">🧴 Klaasipesuvedelik otsas</button>' +
-      '<button class="toggle" data-f="fuel">⛽ Kütust vähe</button></div>' +
+      '<button class="toggle" data-f="washer" aria-label="' + ICON_TITLE.washer + '">' + ICONS.washer + '</button>' +
+      '<button class="toggle" data-f="fuel" aria-label="' + ICON_TITLE.fuel + '">' + ICONS.fuel + '</button></div>' +
       '<div class="actions"><button data-a="close">Tühista</button><button class="primary" data-a="ok">Tagasta</button></div>';
     var d = openDialog(h);
     function upd() {
@@ -299,7 +317,7 @@
     var rows = db.history.filter(function (r) { return !filter || r.carName === filter; }).slice(0, 300);
     rows.forEach(function (r) {
       h += '<tr><td>' + esc(r.carName) + '</td><td>' + esc(r.person) + '</td><td>' + fullTime(r.takenAt) + '</td><td>' +
-        fullTime(r.returnedAt) + '</td><td>' + r.spot + '</td><td>' + (r.washer ? '🧴' : '') + (r.fuel ? '⛽' : '') + '</td></tr>';
+        fullTime(r.returnedAt) + '</td><td>' + r.spot + '</td><td>' + lamps(r) + '</td></tr>';
     });
     if (!rows.length) h += '<tr><td colspan="6">Ajalugu on tühi.</td></tr>';
     h += '</table><div class="actions"><button data-a="close">Sulge</button></div>';
@@ -584,9 +602,10 @@
   // ---------- Service worker (offline) ----------
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     navigator.serviceWorker.register('sw.js').catch(function () {});
-    var reloading = false;
+    var reloading = false, hadController = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
-      if (reloading) return; reloading = true;
+      // esimene paigaldus ei vaja uuesti laadimist – ainult uus versioon
+      if (reloading || !hadController) return; reloading = true;
       // uus versioon – laadi uuesti, kui dialoog pole lahti
       var go = function () { if (overlay.classList.contains('hidden')) location.reload(); else setTimeout(go, 5000); };
       go();

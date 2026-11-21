@@ -2,7 +2,11 @@
 # Käivitab virtuaalse Android-tahvli (WSL + WSLg) ja appi testserveri.
 # Kasutus: bash tools/start_emulator.sh     → tahvlis Chrome'is ava http://localhost:8765
 set -e
-SDK=~/android-sdk; APP="$(cd "$(dirname "$0")/.." && pwd)"
+SDK=~/android-sdk
+# WSL-ist puuduvad teegid (libpulse, nss jne) – alla laaditud ilma rootita: apt-get download + dpkg-deb -x
+X=$SDK/extra-libs/root/usr/lib/x86_64-linux-gnu
+export LD_LIBRARY_PATH=$X:$X/pulseaudio${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+APP="$(cd "$(dirname "$0")/.." && pwd)"
 if [ ! -w /dev/kvm ]; then
   echo "KVM pole lubatud. Käivita üks kord:  sudo chmod 666 /dev/kvm   (või: sudo usermod -aG kvm $USER ja WSL restart)"; exit 1
 fi

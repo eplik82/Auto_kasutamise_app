@@ -55,7 +55,12 @@ button:disabled { opacity: .35; }
 .tile .spot {
   position: absolute; top: 10px; right: 14px; font-size: 44px; font-weight: 800; line-height: 1;
 }
-.tile .flags { position: absolute; bottom: 10px; left: 14px; font-size: 30px; }
+.tile .flags { position: absolute; bottom: 10px; left: 12px; }
+/* armatuurlaua hoiatustuli: merevaigukollane sümbol mustal */
+.lamp { display: inline-block; width: 46px; height: 46px; padding: 6px; margin-right: 6px; border-radius: 10px;
+  background: #111; color: #ffb000; vertical-align: middle; box-shadow: 0 0 0 2px rgba(255,255,255,.25); }
+.lamp svg, .toggle svg { width: 100%; height: 100%; display: block; }
+.hist .lamp { width: 30px; height: 30px; padding: 4px; border-radius: 6px; }
 .tile .note { position: absolute; bottom: 10px; right: 14px; font-size: 15px; opacity: .95; }
 .empty { padding: 40px; font-size: 22px; color: var(--muted); }
 
@@ -85,8 +90,9 @@ button.primary { background: var(--accent); color: #fff; }
 button.danger { background: var(--red); color: var(--red-fg); }
 button.warn { background: var(--yellow); color: var(--yellow-fg); }
 
-.toggle { display: flex; align-items: center; justify-content: center; }
-.toggle.on { background: var(--yellow); color: var(--yellow-fg); }
+.toggle { display: flex; align-items: center; justify-content: center; padding: 18px; color: #8a949e; }
+.toggle svg { width: 84px; height: 84px; }
+.toggle.on { background: #111; color: #ffb000; box-shadow: 0 0 0 4px #ffb000 inset; }
 
 /* Broneerimise päevade tabel */
 .days { width: 100%; border-collapse: collapse; }

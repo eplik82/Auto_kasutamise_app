@@ -8,7 +8,7 @@ Spetsifikatsioon: [`LÄHTEÜLESANNE.md`](LÄHTEÜLESANNE.md). Versioon: 0.1.0.
 ## Kasutamine
 - **Roheline ruut** – auto parklas (E = ees, T = taga). Klikk → vali nimi → auto võetud (punane).
 - **Kollane ruut** – broneering algab 24 h jooksul või kestab. Võtta tohib (küsib kinnitust).
-- **Punane ruut** – kasutuses. Klikk → tagastamine: Ees/Taga + 🧴 klaasipesuvedelik otsas / ⛽ kütust vähe.
+- **Punane ruut** – kasutuses. Klikk → tagastamine: Ees/Taga + armatuurlaua ikoonid (klaasipesuvedelik otsas, kütust vähe).
 - **📅 Broneeri** (nimede aknas) → nimi → poolpäevad (hommik/õhtu), kuni 21 päeva ette.
 - **🕘** ajalugu, **☀/🌙** öö/päev, **⚙** seaded (sõidukid, inimesed, öörežiim, liikumisandur, PIN, varukoopia).
 
