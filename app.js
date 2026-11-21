@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.3.0';
+  var VERSION = '0.4.0';
   var KEY = 'autoapp.v1';
   var DAY_MS = 24 * 3600 * 1000;
   var WEEKDAYS = ['P', 'E', 'T', 'K', 'N', 'R', 'L'];
@@ -46,7 +46,22 @@
     d.settings = Object.assign(def.settings, d.settings || {});
     d.cars.forEach(function (c) { if (!c.tires) c.tires = 'S'; });
     d.people = d.people || []; d.bookings = d.bookings || []; d.history = d.history || [];
+    d.services = d.services || [];
+    migrateServices(d);
     return d;
+  }
+  // v0.3 → v0.4: poolpäevased hooldused (bookings type=service) → services {start, end, comment}
+  function migrateServices(d) {
+    var split = (d.settings && d.settings.halfSplit) || 12, old = [];
+    d.bookings = d.bookings.filter(function (b) { if (b.type === 'service') { old.push(b); return false; } return true; });
+    function st(b) { var x = parseYmd(b.date); if (b.half === 'O') x.setHours(split); return x.getTime(); }
+    function en(b) { var x = parseYmd(b.date); if (b.half === 'H') x.setHours(split); else x.setDate(x.getDate() + 1); return x.getTime(); }
+    old.sort(function (a, b) { return a.carId < b.carId ? -1 : a.carId > b.carId ? 1 : st(a) - st(b); });
+    old.forEach(function (b) {
+      var last = d.services[d.services.length - 1];
+      if (last && last.carId === b.carId && last.end === st(b)) last.end = en(b);
+      else d.services.push({ id: b.id, carId: b.carId, start: st(b), end: en(b), comment: '' });
+    });
   }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { alert('Salvestamine ebaõnnestus: ' + e.message); }
@@ -88,27 +103,48 @@
     return db.bookings.filter(function (b) { return b.carId === carId; })
       .sort(function (a, b) { return slotStart(a) - slotStart(b); });
   }
-  function isService(b) { return b.type === 'service'; }
-  // Lähim broneering (mitte hooldus), mis algab ≤ 24 h pärast või juba kestab
+  function isService(b) { return b.type === 'service'; } // (vana formaat, enam ei kasutata)
+  // Lähim broneering, mis algab ≤ 24 h pärast või juba kestab
   function soonBooking(carId) {
     var now = Date.now(), list = carBookings(carId);
     for (var i = 0; i < list.length; i++) {
-      if (isService(list[i])) continue;
       if (slotStart(list[i]) - now <= DAY_MS && slotEnd(list[i]) > now) return list[i];
     }
     return null;
   }
-  // Praegu kestev hooldus: { slots: [järjestikused poolpäevad], last } või null
-  function serviceNow(carId) {
-    var now = Date.now(), list = carBookings(carId).filter(isService), cur = null;
-    for (var i = 0; i < list.length; i++) {
-      if (!cur) { if (slotStart(list[i]) <= now && slotEnd(list[i]) > now) cur = [list[i]]; }
-      else if (slotStart(list[i]) === slotEnd(cur[cur.length - 1])) cur.push(list[i]);
-      else break;
-    }
-    return cur ? { slots: cur, last: cur[cur.length - 1] } : null;
+
+  // ---------- Hooldused: { id, carId, start, end, comment } ----------
+  function purgeServices() {
+    var now = Date.now(), n = db.services.length;
+    db.services = db.services.filter(function (v) { return v.end > now && carById(v.carId); });
+    if (db.services.length !== n) save();
   }
-  function serviceLabel(sv) { return 'kuni ' + bookingLabel(sv.last); }
+  function carServices(carId) {
+    return db.services.filter(function (v) { return v.carId === carId; }).sort(function (a, b) { return a.start - b.start; });
+  }
+  function serviceNow(carId) {
+    var now = Date.now(), l = carServices(carId);
+    for (var i = 0; i < l.length; i++) if (l[i].start <= now && l[i].end > now) return l[i];
+    return null;
+  }
+  function soonService(carId) {  // algab ≤ 24 h pärast
+    var now = Date.now(), l = carServices(carId);
+    for (var i = 0; i < l.length; i++) if (l[i].start > now && l[i].start - now <= DAY_MS) return l[i];
+    return null;
+  }
+  function serviceOverlap(carId, t0, t1, exceptId) {
+    var l = carServices(carId);
+    for (var i = 0; i < l.length; i++) if (l[i].id !== exceptId && l[i].start < t1 && l[i].end > t0) return l[i];
+    return null;
+  }
+  function relTime(t) {
+    var d = new Date(t), ds = ymd(d), today = ymd(new Date()), tom = ymd(new Date(Date.now() + DAY_MS));
+    return (ds === today ? 'täna' : ds === tom ? 'homme' : dayLabel(d)) + ' ' + hm(t);
+  }
+  function serviceRange(v) {
+    return relTime(v.start) + ' – ' + (ymd(new Date(v.start)) === ymd(new Date(v.end)) ? hm(v.end) : relTime(v.end));
+  }
+  function serviceLabel(v) { return 'kuni ' + relTime(v.end); }
   function findBooking(carId, date, half) {
     for (var i = 0; i < db.bookings.length; i++) {
       var b = db.bookings[i];
@@ -142,13 +178,15 @@
   // ---------- Pealeht ----------
   var grid = document.getElementById('grid');
   function render() {
-    purgeBookings();
+    purgeBookings(); purgeServices();
     var html = '';
     var n = db.cars.length, cls = '';
     if (!n) html = '<div class="empty">Sõidukeid pole. Lisa need seadetes ⚙.</div>';
     db.cars.forEach(function (c) {
-      var sb = soonBooking(c.id), sv = serviceNow(c.id);
-      var state = c.user ? 'red' : (sv ? 'grey' : (sb ? 'yellow' : 'green'));
+      var sb = soonBooking(c.id), sv = serviceNow(c.id), ss = soonService(c.id);
+      // kollane: lähim broneering või eelseisev hooldus (kumb varem)
+      var firstSoon = (ss && (!sb || ss.start < slotStart(sb))) ? 'svc' : (sb ? 'bk' : null);
+      var state = c.user ? 'red' : (sv ? 'grey' : (firstSoon ? 'yellow' : 'green'));
       var flags = lamps(c);
       html += '<div class="tile ' + state + ' ' + cls + '" data-id="' + c.id + '">';
       if (state !== 'red') html += '<div class="spot">' + c.spot + '</div>';
@@ -157,9 +195,14 @@
       if (state === 'red') {
         html += '<div class="who">' + esc(c.user) + '</div><div class="sub">alates ' + (sameDay(c.takenAt) ? hm(c.takenAt) : fullTime(c.takenAt)) + '</div>';
         if (sv) html += '<div class="note">🔧 hooldus ' + serviceLabel(sv) + '</div>';
+        else if (firstSoon === 'svc') html += '<div class="note">🔧 hooldus ' + relTime(ss.start) + '</div>';
         else if (sb) html += '<div class="note">📅 ' + esc(sb.person) + ' ' + bookingLabel(sb) + '</div>';
       } else if (state === 'grey') {
         html += '<div class="who">🔧 Hooldus</div><div class="sub">' + serviceLabel(sv) + '</div>';
+        if (sv.comment) html += '<div class="sub cmt">' + esc(sv.comment) + '</div>';
+      } else if (state === 'yellow' && firstSoon === 'svc') {
+        html += '<div class="who">🔧 Hooldus</div><div class="sub">' + serviceRange(ss) + '</div>';
+        if (ss.comment) html += '<div class="sub cmt">' + esc(ss.comment) + '</div>';
       } else if (state === 'yellow') {
         html += '<div class="who">📅 ' + esc(sb.person) + '</div><div class="sub">' + bookingLabel(sb) + '</div>';
       }
@@ -236,9 +279,12 @@
 
   // Võtmine: nimede loetelu + Broneeri nupp + selle auto broneeringud
   function showTake(car) {
-    var sb = soonBooking(car.id), sv = serviceNow(car.id);
+    var sb = soonBooking(car.id), sv = serviceNow(car.id), ss = soonService(car.id);
     var h = '<h2>' + esc(car.name) + ' – kes võtab?</h2>';
-    if (sv) h += '<p class="info">🔧 Hoolduses <b>' + serviceLabel(sv) + '</b> <button class="danger" data-a="endsvc" style="height:44px;padding:0 14px;margin-left:10px">Lõpeta hooldus</button></p>';
+    if (sv) h += '<p class="info">🔧 Hoolduses <b>' + serviceLabel(sv) + '</b>' + (sv.comment ? ' – ' + esc(sv.comment) : '') +
+      ' <button class="danger" data-a="endsvc" style="height:44px;padding:0 14px;margin-left:10px">Lõpeta hooldus</button></p>';
+    else if (ss) h += '<p class="info">🔧 Hooldus <b>' + serviceRange(ss) + '</b>' + (ss.comment ? ' – ' + esc(ss.comment) : '') + '</p>';
+    if (sv) {}
     else if (sb) h += '<p class="info">📅 Broneeritud: <b>' + esc(sb.person) + '</b>, ' + bookingLabel(sb) + '</p>';
     else h += '<p class="info">Auto on parklas: <b>' + (car.spot === 'E' ? 'ees' : 'taga') + '</b></p>';
     if (!db.people.length) h += '<p class="info">Inimesi pole. Lisa need seadetes ⚙.</p>';
@@ -247,11 +293,19 @@
       h += '<button data-p="' + i + '"' + (sb && sb.person === p ? ' class="booker"' : '') + '>' + esc(p) + '</button>';
     });
     h += '</div>';
-    var list = carBookings(car.id);
+    var list = carBookings(car.id), svl = carServices(car.id);
+    if (svl.length) {
+      h += '<h3>Hooldused</h3><ul class="list">';
+      svl.forEach(function (v) {
+        h += '<li><span class="grow">🔧 ' + serviceRange(v) + (v.comment ? ' – <i>' + esc(v.comment) + '</i>' : '') + '</span>' +
+          '<button data-editsvc="' + v.id + '">Muuda</button><button data-delsvc="' + v.id + '" class="danger">Tühista</button></li>';
+      });
+      h += '</ul>';
+    }
     if (list.length) {
       h += '<h3>Broneeringud</h3><ul class="list">';
       list.forEach(function (b) {
-        h += '<li><span class="grow">' + (isService(b) ? '🔧 Hooldus' : esc(b.person)) + ' – ' + bookingLabel(b) + '</span><button data-del="' + b.id + '" class="danger">Tühista</button></li>';
+        h += '<li><span class="grow">' + esc(b.person) + ' – ' + bookingLabel(b) + '</span><button data-del="' + b.id + '" class="danger">Tühista</button></li>';
       });
       h += '</ul>';
     }
@@ -260,19 +314,25 @@
     var d = openDialog(h);
     on(d, '[data-a=close]', 'click', closeDialog);
     on(d, '[data-a=book]', 'click', function () { showBookPerson(car); });
-    on(d, '[data-a=svc]', 'click', function () { showBookSlots(car, null); });
+    on(d, '[data-a=svc]', 'click', function () { showServiceForm(car, null); });
+    on(d, '[data-editsvc]', 'click', function () { showServiceForm(car, svcById(this.getAttribute('data-editsvc'))); });
+    on(d, '[data-delsvc]', 'click', function () {
+      var v = svcById(this.getAttribute('data-delsvc'));
+      confirmBox('Tühistan hoolduse ' + serviceRange(v) + '?', 'Tühista', function () {
+        db.services = db.services.filter(function (x) { return x !== v; }); save(); showTake(car);
+      }, 'danger', function () { showTake(car); });
+    });
     on(d, '[data-a=endsvc]', 'click', function () {
       confirmBox('Lõpetan hoolduse – auto on jälle kasutatav?', 'Lõpeta', function () {
-        var ids = sv.slots.map(function (b) { return b.id; });
-        db.bookings = db.bookings.filter(function (b) { return ids.indexOf(b.id) < 0; });
+        db.services = db.services.filter(function (x) { return x !== sv; });
         save(); closeDialog();
-      }, 'danger');
+      }, 'danger', function () { showTake(car); });
     });
     on(d, '[data-p]', 'click', function () {
       var person = db.people[+this.getAttribute('data-p')];
-      if (sv) {
-        confirmBox('Auto on hoolduses ' + serviceLabel(sv) + '. Kas ' + esc(person) + ' võtab ikkagi?',
-          'Võtan', function () { take(car, person); }, 'warn');
+      if (sv || ss) {
+        confirmBox((sv ? 'Auto on hoolduses ' + serviceLabel(sv) : 'Hooldus algab ' + relTime(ss.start)) +
+          '. Kas ' + esc(person) + ' võtab ikkagi?', 'Võtan', function () { take(car, person); }, 'warn', function () { showTake(car); });
       } else if (sb && sb.person !== person) {
         confirmBox('Auto on broneeritud: ' + esc(sb.person) + ', ' + bookingLabel(sb) + '. Kas ' + esc(person) + ' võtab ikkagi?',
           'Võtan', function () { take(car, person); }, 'warn');
@@ -340,8 +400,7 @@
   function showBookSlots(car, person) {
     var picked = {}; // 'YYYY-MM-DD|H' -> true
     var now = Date.now();
-    var svc = !person;
-    var h = '<h2>' + esc(car.name) + ' – ' + (svc ? '🔧 hooldus' : esc(person)) + '</h2><p class="info">Vali ' + (svc ? 'hoolduse ' : '') +
+    var h = '<h2>' + esc(car.name) + ' – ' + esc(person) + '</h2><p class="info">Vali ' +
       'poolpäevad (hommik 00–' + pad(db.settings.halfSplit) + ', õhtu ' + pad(db.settings.halfSplit) +
       '–24). Kollane = broneeritud, hall = hooldus.</p><table class="days">';
     for (var i = 0; i < BOOK_DAYS; i++) {
@@ -350,12 +409,13 @@
       h += '<tr><td class="d">' + (i === 0 ? 'Täna ' : (i === 1 ? 'Homme ' : '')) + dayLabel(d) + '</td>';
       ['H', 'O'].forEach(function (half) {
         var ex = findBooking(car.id, ds, half), past = slotEnd({ date: ds, half: half }) <= now;
-        h += '<td><button data-k="' + ds + '|' + half + '"' + (ex ? ' class="' + (isService(ex) ? 'svc' : 'taken') + '" disabled' : '') + (past ? ' disabled' : '') + '>' +
-          (ex ? (isService(ex) ? '🔧 Hooldus' : esc(ex.person)) : (half === 'H' ? 'Hommik' : 'Õhtu')) + '</button></td>';
+        var sl = { date: ds, half: half }, so = serviceOverlap(car.id, slotStart(sl), slotEnd(sl));
+        h += '<td><button data-k="' + ds + '|' + half + '"' + (ex ? ' class="taken" disabled' : (so ? ' class="svc" disabled' : '')) + (past ? ' disabled' : '') + '>' +
+          (ex ? esc(ex.person) : (so ? '🔧 Hooldus' : (half === 'H' ? 'Hommik' : 'Õhtu'))) + '</button></td>';
       });
       h += '</tr>';
     }
-    h += '</table><div class="actions"><button data-a="back">Tagasi</button><button class="primary" data-a="ok" disabled>' + (svc ? 'Salvesta hooldus' : 'Broneeri') + '</button></div>';
+    h += '</table><div class="actions"><button data-a="back">Tagasi</button><button class="primary" data-a="ok" disabled>Broneeri</button></div>';
     var dlg = openDialog(h);
     var okBtn = dlg.querySelector('[data-a=ok]');
     on(dlg, '[data-k]', 'click', function () {
@@ -364,16 +424,58 @@
       this.className = picked[k] ? 'sel' : '';
       okBtn.disabled = !Object.keys(picked).length;
     });
-    on(dlg, '[data-a=back]', 'click', function () { if (svc) showTake(car); else showBookPerson(car); });
+    on(dlg, '[data-a=back]', 'click', function () { showBookPerson(car); });
     on(dlg, '[data-a=ok]', 'click', function () {
       Object.keys(picked).forEach(function (k) {
         var p = k.split('|');
         if (findBooking(car.id, p[0], p[1])) return;
-        var rec = { id: uid(), carId: car.id, person: svc ? '' : person, date: p[0], half: p[1] };
-        if (svc) rec.type = 'service';
-        db.bookings.push(rec);
+        db.bookings.push({ id: uid(), carId: car.id, person: person, date: p[0], half: p[1] });
       });
       save(); showTake(car);
+    });
+  }
+
+  // ---------- Hoolduse sisestamine: kuupäev + kellaaeg + kommentaar ----------
+  function svcById(id) { for (var i = 0; i < db.services.length; i++) if (db.services[i].id === id) return db.services[i]; return null; }
+  function toLocalInput(t) { var d = new Date(t); return { date: ymd(d), time: hm(t) }; }
+  function fromInputs(date, time) {
+    if (!date || !time) return NaN;
+    var p = date.split('-'), q = time.split(':');
+    return new Date(+p[0], +p[1] - 1, +p[2], +q[0], +q[1]).getTime();
+  }
+  function showServiceForm(car, v) {
+    var tom = new Date(); tom.setDate(tom.getDate() + 1);
+    var st = v ? toLocalInput(v.start) : { date: ymd(tom), time: '08:00' };
+    var en = v ? toLocalInput(v.end) : { date: ymd(tom), time: '17:00' };
+    var h = '<h2>' + esc(car.name) + ' – 🔧 ' + (v ? 'muuda hooldust' : 'uus hooldus') + '</h2>' +
+      '<div class="form-row"><label>Algus</label><input type="date" id="sd" value="' + st.date + '"> &nbsp; <input type="time" id="stt" value="' + st.time + '"></div>' +
+      '<div class="form-row"><label>Lõpp</label><input type="date" id="ed" value="' + en.date + '"> &nbsp; <input type="time" id="ett" value="' + en.time + '"></div>' +
+      '<div class="form-row"><label>Kommentaar</label><input type="text" id="cm" maxlength="80" placeholder="nt rehvivahetus, Autokeskus" value="' + esc(v ? v.comment : '') + '" style="flex:1"></div>' +
+      '<p class="info">24 h enne algust läheb ruut kollaseks (🔧 hoiatus), hoolduse ajal on ruut hall.</p>' +
+      '<div class="actions"><button data-a="back">Tagasi</button><button class="primary" data-a="ok">Salvesta hooldus</button></div>';
+    var d = openDialog(h);
+    // lõpu kuupäev järgib algust, kui kasutaja seda eraldi ei muuda
+    var sd = d.querySelector('#sd'), ed = d.querySelector('#ed');
+    sd.addEventListener('change', function () { if (ed.value < sd.value) ed.value = sd.value; });
+    on(d, '[data-a=back]', 'click', function () { showTake(car); });
+    on(d, '[data-a=ok]', 'click', function () {
+      var a = fromInputs(sd.value, d.querySelector('#stt').value), b = fromInputs(ed.value, d.querySelector('#ett').value);
+      var cm = d.querySelector('#cm').value.trim();
+      if (isNaN(a) || isNaN(b)) { alert('Sisesta algus ja lõpp (kuupäev ja kellaaeg).'); return; }
+      if (b <= a) { alert('Lõpp peab olema hiljem kui algus.'); return; }
+      if (b <= Date.now()) { alert('See aeg on juba möödas.'); return; }
+      var o = serviceOverlap(car.id, a, b, v ? v.id : null);
+      if (o) { alert('Sel ajal on juba hooldus: ' + serviceRange(o)); return; }
+      function doSave() {
+        if (v) { v.start = a; v.end = b; v.comment = cm; }
+        else db.services.push({ id: uid(), carId: car.id, start: a, end: b, comment: cm });
+        save(); showTake(car);
+      }
+      var clash = carBookings(car.id).filter(function (x) { return slotStart(x) < b && slotEnd(x) > a; });
+      if (clash.length) {
+        confirmBox('Sel ajal on broneering: ' + clash.map(function (x) { return esc(x.person) + ' ' + bookingLabel(x); }).join(', ') +
+          '. Salvestan hoolduse ikkagi?', 'Salvesta', doSave, 'warn', function () { showServiceForm(car, v); });
+      } else doSave();
     });
   }
 
@@ -381,7 +483,7 @@
   var CAL_DAYS = 14;
   function futureBookings() {
     var now = Date.now();
-    return db.bookings.filter(function (b) { return !isService(b) && slotEnd(b) > now && carById(b.carId); })
+    return db.bookings.filter(function (b) { return slotEnd(b) > now && carById(b.carId); })
       .sort(function (a, b) { return slotStart(a) - slotStart(b); });
   }
   function updBadge() {
@@ -409,16 +511,17 @@
       days.forEach(function (d) {
         var ds = ymd(d);
         ['H', 'O'].forEach(function (half) {
-          var b = findBooking(c.id, ds, half), past = slotEnd({ date: ds, half: half }) <= now;
-          var cls = b ? (isService(b) ? 'svc' : 'bk') : (past ? 'past' : 'free');
+          var sl = { date: ds, half: half }, b = findBooking(c.id, ds, half), past = slotEnd(sl) <= now;
+          var so = serviceOverlap(c.id, slotStart(sl), slotEnd(sl));
+          var cls = b ? 'bk' : (so ? 'svc' : (past ? 'past' : 'free'));
           if (ds === today) cls += ' today';
-          h += '<td class="' + cls + '" data-c="' + ci + '" data-k="' + ds + '|' + half + '">' +
-            (b ? (isService(b) ? '🔧' : esc(b.person)) : '') + '</td>';
+          h += '<td class="' + cls + '" data-c="' + ci + '" data-k="' + ds + '|' + half + '"' + (so ? ' data-svc="' + so.id + '" title="' + esc(so.comment) + '"' : '') + '>' +
+            (b ? esc(b.person) : (so ? '🔧' : '')) + '</td>';
         });
       });
       h += '</tr>';
     });
-    h += '</table></div><p class="info">Puuduta vaba lahtrit, et broneerida; broneeringut, et tühistada. Kollane = broneering, hall = hooldus.</p>';
+    h += '</table></div><p class="info">Puuduta vaba lahtrit, et broneerida; broneeringut, et tühistada. Kollane = broneering, hall 🔧 = hooldus.</p>';
     var list = futureBookings();
     h += '<h3>Lähimad broneeringud (' + list.length + ')</h3><ul class="list">';
     list.slice(0, 40).forEach(function (b) {
@@ -432,7 +535,7 @@
     on(dlg, '[data-a=close]', 'click', closeDialog);
     on(dlg, '[data-nav]', 'click', function () { var v = +this.getAttribute('data-nav'); showCalendar(v === 0 ? 0 : Math.max(0, off + v)); });
     function cancel(b) {
-      var what = isService(b) ? 'hoolduse' : 'broneeringu (' + esc(b.person) + ')';
+      var what = 'broneeringu (' + esc(b.person) + ')';
       confirmBox('Tühistan ' + what + ': ' + esc(carById(b.carId).name) + ', ' + bookingLabel(b) + '?', 'Tühista', function () {
         db.bookings = db.bookings.filter(function (x) { return x.id !== b.id; }); save(); showCalendar(off);
       }, 'danger', function () { showCalendar(off); });
@@ -445,6 +548,13 @@
       var car = db.cars[+this.getAttribute('data-c')], k = this.getAttribute('data-k').split('|');
       var b = findBooking(car.id, k[0], k[1]);
       if (b) return cancel(b);
+      var svid = this.getAttribute('data-svc');
+      if (svid) {
+        var v = svcById(svid);
+        return confirmBox('🔧 Hooldus ' + esc(car.name) + ': ' + serviceRange(v) + (v.comment ? ' – ' + esc(v.comment) : '') + '. Tühistan hoolduse?',
+          'Tühista', function () { db.services = db.services.filter(function (x) { return x !== v; }); save(); showCalendar(off); },
+          'danger', function () { showCalendar(off); });
+      }
       if (/past/.test(this.className)) return;
       // vaba lahter → vali nimi
       var hh = '<h2>' + esc(car.name) + ' – ' + bookingLabel({ date: k[0], half: k[1] }) + '</h2><p class="info">Kes broneerib?</p>' +
@@ -575,6 +685,7 @@
       if (!confirm('Kustutan sõiduki "' + c.name + '" ja selle broneeringud?')) return;
       db.cars = db.cars.filter(function (x) { return x !== c; });
       db.bookings = db.bookings.filter(function (b) { return b.carId !== c.id; });
+      db.services = db.services.filter(function (v) { return v.carId !== c.id; });
       save(); showSettings();
     });
     on(d, '[data-a=addp]', 'click', function () {
