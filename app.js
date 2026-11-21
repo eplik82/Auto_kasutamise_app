@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.4.2';
+  var VERSION = '0.5.0';
   var KEY = 'autoapp.v1';
   var DAY_MS = 24 * 3600 * 1000;
   var WEEKDAYS = ['P', 'E', 'T', 'K', 'N', 'R', 'L'];
@@ -699,7 +699,8 @@
       '<div class="form-row"><label>Ekraan mustaks pärast</label><select id="slp">' +
       SLEEP_OPTS.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === +s.sleepSec ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
       '<div class="form-row"><label>Kaamera olek</label><span class="val" id="camst">' + cam.status + '</span>' +
-      '<button data-a="camstart" style="height:48px;padding:0 16px;margin-left:10px">Käivita kaamera</button></div>' +
+      '<button data-a="camstart" style="height:48px;padding:0 16px;margin-left:10px">Testi kaamerat</button></div>' +
+      '<p class="info">Kaamera töötab ainult siis, kui ekraan on must (ootab liikumist). Testimiseks töötab ta, kuni see aken on lahti.</p>' +
       '<div class="form-row"><label>Liikumine</label><span class="ind" id="motInd"><i></i><span>–</span></span></div>';
 
     h += '<h3>Muu</h3>' +
@@ -713,7 +714,7 @@
 
     var d = openDialog(h);
     on(d, '[data-tab]', 'click', function () { showSettings(this.getAttribute('data-tab')); });
-    onClose = function () { applyTheme(); cam.apply(); };
+    onClose = function () { cam.testing = false; applyTheme(); cam.apply(); };
     on(d, '[data-a=close]', 'click', closeDialog);
     on(d, '[data-a=addcar]', 'click', function () {
       var n = prompt('Sõiduki nimi:'); if (!n || !n.trim()) return;
@@ -774,7 +775,7 @@
       s.lightThreshold = Math.round(cam.light); save();
       d.querySelector('#lt').value = s.lightThreshold; d.querySelector('#ltv').textContent = s.lightThreshold;
     });
-    on(d, '[data-a=camstart]', 'click', function () { cam.start(true); });
+    on(d, '[data-a=camstart]', 'click', function () { cam.testing = true; cam.start(true); });
     on(d, '[data-a=export]', 'click', exportData);
     on(d, '[data-a=import]', 'click', importData);
     var liveTimer = setInterval(function () {
@@ -784,8 +785,8 @@
       var mi = d.querySelector('#motInd');
       if (mi) {
         var act = cam.stream && Date.now() - cam.lastMotion < 1200;
-        mi.className = 'ind' + (act ? ' on' : '') + (cam.stream ? '' : ' off');
-        mi.lastChild.textContent = !cam.stream ? 'kaamera ei tööta' :
+        mi.className = 'ind' + (act ? ' on' : '') + (cam.stream ? '' : (cam.denied ? ' off' : ''));
+        mi.lastChild.textContent = !cam.stream ? (cam.denied ? 'kaamera keelatud – luba seadme seadetes' : 'ootab musta ekraani (vajuta "Testi kaamerat")') :
           (act ? 'TUVASTAB liikumist' : 'liikumist pole') + '  (muutus ' + cam.md.toFixed(1) + ' / lävi ' + cam.thr.toFixed(1) + ')';
       }
     }, 250);
@@ -845,22 +846,34 @@
   // ---------- Kaamera: liikumis- ja valgusandur ----------
   var cam = {
     status: 'väljas', light: -1, stream: null, timer: null, prev: null, lastMotion: 0, md: 0, thr: 0,
+    startedAt: 0, testing: false, measuring: false, denied: false, starting: false,
     video: document.getElementById('cam'), canvas: document.getElementById('camCanvas'),
-    wanted: function () { return db.settings.motion || db.settings.themeMode === 'light'; },
+    // Kaamera töötab AINULT musta ekraani ajal (iOS/Android näitavad kaamera kasutamisel ikooni).
+    // Erandid: seadetes "Käivita kaamera" (testimine) ja valguse lühimõõtmine ärkvel olles.
+    supported: function () { return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) && !this.denied; },
+    wanted: function () {
+      var need = db.settings.motion || db.settings.themeMode === 'light';
+      return (sleeping && need) || this.testing || this.measuring;
+    },
     apply: function () { if (this.wanted()) this.start(false); else this.stop(); },
     start: function (userAsked) {
       var self = this;
-      if (this.stream) return;
+      if (this.stream || this.starting) return;
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { this.status = 'pole toetatud (vana seade?)'; return; }
-      this.status = 'käivitub…';
+      if (userAsked) this.denied = false;
+      this.status = 'käivitub…'; this.starting = true;
       navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 160 }, height: { ideal: 120 } }, audio: false })
         .then(function (st) {
-          self.stream = st; self.video.srcObject = st;
+          self.starting = false;
+          if (!self.wanted() && !userAsked) { st.getTracks().forEach(function (t) { t.stop(); }); self.status = 'väljas'; return; }
+          self.stream = st; self.video.srcObject = st; self.startedAt = Date.now();
           var p = self.video.play(); if (p && p.catch) p.catch(function () {});
           self.status = 'töötab'; self.prev = null;
           self.timer = setInterval(function () { self.sample(); }, 500);
         })
         .catch(function (e) {
+          self.starting = false;
+          if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) self.denied = true;
           self.status = 'ei saa kasutada: ' + (e && e.name ? e.name : e);
           if (userAsked) alert('Kaamerat ei saanud käivitada (' + (e && e.name) + '). Luba kaamera seadme seadetes.');
         });
@@ -868,7 +881,8 @@
     stop: function () {
       if (this.timer) clearInterval(this.timer); this.timer = null;
       if (this.stream) this.stream.getTracks().forEach(function (t) { t.stop(); });
-      this.stream = null; this.light = -1; this.status = 'väljas';
+      // viimane valguse väärtus jääb alles (öövaade valguse järgi)
+      this.stream = null; this.status = this.denied ? this.status : 'väljas (käivitub mustal ekraanil)';
     },
     sample: function () {
       var v = this.video; if (!v.videoWidth) return;
@@ -887,7 +901,8 @@
         var md = diff / n;
         var thr = 2 + (100 - db.settings.sensitivity) * 0.25; // tundlikkus 100 → 2, 1 → ~27
         this.md = md; this.thr = thr;
-        if (md > thr) { this.lastMotion = Date.now(); if (db.settings.motion) activity(); }
+        // esimesed 2,5 s ignoreeri – kaamera automaatsäritus muudab pilti ja annaks vale äratuse
+        if (md > thr && Date.now() - this.startedAt > 2500) { this.lastMotion = Date.now(); if (db.settings.motion && sleeping) activity(); }
       }
       this.prev = cur;
     }
@@ -902,9 +917,11 @@
     clearTimeout(sleepTimer);
     sleepEl.className = 'show';                       // nähtav, läbipaistev
     setTimeout(function () { if (sleeping) sleepEl.className = 'show dark'; }, 30); // sujuvalt mustaks (CSS transition)
+    cam.apply();                                      // kaamera sisse – ootab liikumist
   }
   function wake() {
     if (!sleeping) return; sleeping = false;
+    cam.apply();                                      // kaamera välja – ikoon kaob
     render(); applyTheme(); requestWakeLock();
     sleepEl.className = 'show';                       // sujuvalt läbipaistvaks
     clearTimeout(sleepTimer);
@@ -917,7 +934,7 @@
   // Puudutus mustal ekraanil ainult äratab, ei vajuta ruudule
   sleepEl.addEventListener('click', function (e) { e.stopPropagation(); });
   function checkSleep() {
-    if (!db.settings.motion || !cam.stream) return; // ilma andurita ei uinu (muidu ei ärkaks ise)
+    if (!db.settings.motion || !cam.supported()) return; // ilma andurita ei uinu (muidu ei ärkaks ise)
     if (!overlay.classList.contains('hidden')) return;
     if (Date.now() - lastActivity > (+db.settings.sleepSec || 120) * 1000) goSleep();
   }
@@ -997,6 +1014,12 @@
   setInterval(tick, 10000);
   setInterval(function () { if (overlay.classList.contains('hidden')) render(); applyTheme(); checkSleep(); }, 30000);
   setInterval(checkSleep, 1000);
+  // Öövaade ruumi valguse järgi: ärkvel olles lühike mõõtmine iga 10 min (≈4 s)
+  setInterval(function () {
+    if (sleeping || db.settings.themeMode !== 'light' || !cam.supported() || cam.stream) return;
+    cam.measuring = true; cam.apply();
+    setTimeout(function () { cam.measuring = false; cam.apply(); applyTheme(); }, 4000);
+  }, 600000);
 
   tick(); applyTheme(); render(); requestWakeLock(); cam.apply();
 
