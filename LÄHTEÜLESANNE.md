@@ -134,3 +134,4 @@ inimeste nimekiri, poolpäevade kellaajad (eeldus: hommik 00–12, õhtu 12–24
 | 16 | 2026-11-21 | Liikumise tuvastuse järel pilt sujuvalt käima (fade), uinumine ka sujuv | tehtud v0.3.0 |
 | 17 | 2026-11-21 | Parandus: kui brauser täisekraani ei luba, ei neela app enam kõiki puudutusi | tehtud v0.3.0 |
 | 18 | 2026-11-21 | Hooldus: kellaaeg (algus/lõpp kuupäev+kell) + kommentaar; 24 h enne algust kollane 🔧 hoiatus ruudul; hoolduse ajal hall; Muuda/Tühista; vanad poolpäeva-hooldused teisendatakse | tehtud v0.4.0 |
+| 19 | 2026-11-21 | Kuupäeva formaat pp.kk.aaaa + 24 h kell (oma valikud, mitte seadme keelest sõltuvad date/time väljad); kesköö lõpp = "24:00" | tehtud v0.4.1 |

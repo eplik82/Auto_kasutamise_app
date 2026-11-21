@@ -196,3 +196,10 @@ button.bigadd { height: 60px; padding: 0 26px; font-size: 20px; font-weight: 600
 .tile .sub.cmt { font-style: italic; max-width: 90%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .form-row input[type=date] { font: inherit; font-size: 20px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
 .tile { padding-top: 1.35em; }
+
+/* kuupäeva/kella valik pp.kk.aaaa hh:mm */
+.dtp { display: inline-flex; align-items: center; font-size: 22px; font-weight: 600; }
+.dtp select { font: inherit; font-size: 22px; padding: 8px 6px; margin: 0 2px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--fg); -webkit-appearance: none; appearance: none; text-align: center; min-width: 56px; }
+.dtp select[data-p=y] { min-width: 86px; }
+.gap { display: inline-block; width: 18px; text-align: center; }

@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.4.0';
+  var VERSION = '0.4.1';
   var KEY = 'autoapp.v1';
   var DAY_MS = 24 * 3600 * 1000;
   var WEEKDAYS = ['P', 'E', 'T', 'K', 'N', 'R', 'L'];
@@ -137,14 +137,18 @@
     for (var i = 0; i < l.length; i++) if (l[i].id !== exceptId && l[i].start < t1 && l[i].end > t0) return l[i];
     return null;
   }
-  function relTime(t) {
-    var d = new Date(t), ds = ymd(d), today = ymd(new Date()), tom = ymd(new Date(Date.now() + DAY_MS));
-    return (ds === today ? 'täna' : ds === tom ? 'homme' : dayLabel(d)) + ' ' + hm(t);
+  // isEnd: lõpuaeg kesköösel näidatakse eelmise päeva "24:00" (mitte järgmise päeva 00:00)
+  function relTime(t, isEnd) {
+    var d = new Date(t), mid = isEnd && d.getHours() === 0 && d.getMinutes() === 0;
+    if (mid) d = new Date(t - 60000);
+    var ds = ymd(d), today = ymd(new Date()), tom = ymd(new Date(Date.now() + DAY_MS));
+    return (ds === today ? 'täna' : ds === tom ? 'homme' : dayLabel(d)) + ' ' + (mid ? '24:00' : hm(t));
   }
   function serviceRange(v) {
-    return relTime(v.start) + ' – ' + (ymd(new Date(v.start)) === ymd(new Date(v.end)) ? hm(v.end) : relTime(v.end));
+    var sameDay = ymd(new Date(v.start)) === ymd(new Date(v.end - 60000));
+    return relTime(v.start) + ' – ' + (sameDay ? (relTime(v.end, true).split(' ').pop()) : relTime(v.end, true));
   }
-  function serviceLabel(v) { return 'kuni ' + relTime(v.end); }
+  function serviceLabel(v) { return 'kuni ' + relTime(v.end, true); }
   function findBooking(carId, date, half) {
     for (var i = 0; i < db.bookings.length; i++) {
       var b = db.bookings[i];
@@ -443,25 +447,63 @@
     var p = date.split('-'), q = time.split(':');
     return new Date(+p[0], +p[1] - 1, +p[2], +q[0], +q[1]).getTime();
   }
+  // Oma kuupäeva/kella valik: alati pp.kk.aaaa ja 24 h (brauseri date/time väljad sõltuvad seadme keelest)
+  function opts(from, to, cur, step) {
+    var h = '';
+    for (var i = from; i <= to; i += (step || 1)) h += '<option value="' + i + '"' + (i === cur ? ' selected' : '') + '>' + pad(i) + '</option>';
+    return h;
+  }
+  function dtPicker(id, t) {
+    var d = new Date(t), y = d.getFullYear(), m = Math.round(d.getMinutes() / 5) * 5;
+    if (m === 60) m = 55;
+    return '<span class="dtp" id="' + id + '">' +
+      '<select data-p="d">' + opts(1, 31, d.getDate()) + '</select>.' +
+      '<select data-p="m">' + opts(1, 12, d.getMonth() + 1) + '</select>.' +
+      '<select data-p="y">' + opts(y - 1, y + 2, y) + '</select>' +
+      '<span class="gap"></span>' +
+      '<select data-p="h">' + opts(0, 23, d.getHours()) + '</select>:' +
+      '<select data-p="i">' + opts(0, 55, m, 5) + '</select></span>';
+  }
+  function readPicker(root, id) {
+    var el = root.querySelector('#' + id), g = function (k) { return +el.querySelector('[data-p=' + k + ']').value; };
+    var dt = new Date(g('y'), g('m') - 1, g('d'), g('h'), g('i'));
+    if (dt.getDate() !== g('d')) return NaN; // nt 31.02
+    return dt.getTime();
+  }
+  function setPicker(root, id, t) {
+    var el = root.querySelector('#' + id), d = new Date(t);
+    var set = function (k, v) { el.querySelector('[data-p=' + k + ']').value = v; };
+    set('d', d.getDate()); set('m', d.getMonth() + 1); set('y', d.getFullYear()); set('h', d.getHours()); set('i', Math.min(55, Math.round(d.getMinutes() / 5) * 5));
+  }
+  function timePicker(id, hhmm) {
+    var p = (hhmm || '00:00').split(':');
+    return '<span class="dtp" id="' + id + '"><select data-p="h">' + opts(0, 23, +p[0]) + '</select>:' +
+      '<select data-p="i">' + opts(0, 55, Math.round(+p[1] / 5) * 5, 5) + '</select></span>';
+  }
+  function readTime(root, id) {
+    var el = root.querySelector('#' + id);
+    return pad(+el.querySelector('[data-p=h]').value) + ':' + pad(+el.querySelector('[data-p=i]').value);
+  }
   function showServiceForm(car, v) {
-    var tom = new Date(); tom.setDate(tom.getDate() + 1);
-    var st = v ? toLocalInput(v.start) : { date: ymd(tom), time: '08:00' };
-    var en = v ? toLocalInput(v.end) : { date: ymd(tom), time: '17:00' };
+    var tom = new Date(); tom.setDate(tom.getDate() + 1); tom.setHours(8, 0, 0, 0);
+    var st = v ? v.start : tom.getTime(), en = v ? v.end : tom.getTime() + 9 * 3600000;
     var h = '<h2>' + esc(car.name) + ' – 🔧 ' + (v ? 'muuda hooldust' : 'uus hooldus') + '</h2>' +
-      '<div class="form-row"><label>Algus</label><input type="date" id="sd" value="' + st.date + '"> &nbsp; <input type="time" id="stt" value="' + st.time + '"></div>' +
-      '<div class="form-row"><label>Lõpp</label><input type="date" id="ed" value="' + en.date + '"> &nbsp; <input type="time" id="ett" value="' + en.time + '"></div>' +
+      '<div class="form-row"><label>Algus</label>' + dtPicker('ps', st) + '</div>' +
+      '<div class="form-row"><label>Lõpp</label>' + dtPicker('pe', en) + '</div>' +
       '<div class="form-row"><label>Kommentaar</label><input type="text" id="cm" maxlength="80" placeholder="nt rehvivahetus, Autokeskus" value="' + esc(v ? v.comment : '') + '" style="flex:1"></div>' +
       '<p class="info">24 h enne algust läheb ruut kollaseks (🔧 hoiatus), hoolduse ajal on ruut hall.</p>' +
       '<div class="actions"><button data-a="back">Tagasi</button><button class="primary" data-a="ok">Salvesta hooldus</button></div>';
     var d = openDialog(h);
-    // lõpu kuupäev järgib algust, kui kasutaja seda eraldi ei muuda
-    var sd = d.querySelector('#sd'), ed = d.querySelector('#ed');
-    sd.addEventListener('change', function () { if (ed.value < sd.value) ed.value = sd.value; });
+    // kui algus nihkub lõpust hilisemaks, nihuta lõpp samale päevale (sama kestusega kui võimalik)
+    on(d, '#ps select', 'change', function () {
+      var a = readPicker(d, 'ps'), b = readPicker(d, 'pe');
+      if (!isNaN(a) && (isNaN(b) || b <= a)) setPicker(d, 'pe', a + 9 * 3600000);
+    });
     on(d, '[data-a=back]', 'click', function () { showTake(car); });
     on(d, '[data-a=ok]', 'click', function () {
-      var a = fromInputs(sd.value, d.querySelector('#stt').value), b = fromInputs(ed.value, d.querySelector('#ett').value);
+      var a = readPicker(d, 'ps'), b = readPicker(d, 'pe');
       var cm = d.querySelector('#cm').value.trim();
-      if (isNaN(a) || isNaN(b)) { alert('Sisesta algus ja lõpp (kuupäev ja kellaaeg).'); return; }
+      if (isNaN(a) || isNaN(b)) { alert('Vigane kuupäev (nt 31.02). Kontrolli algust ja lõppu.'); return; }
       if (b <= a) { alert('Lõpp peab olema hiljem kui algus.'); return; }
       if (b <= Date.now()) { alert('See aeg on juba möödas.'); return; }
       var o = serviceOverlap(car.id, a, b, v ? v.id : null);
@@ -639,7 +681,7 @@
       seg('badge', [['1', 'Näita'], ['0', 'Peida']], s.badge ? '1' : '0') + '</div>';
     h += '<h3>Öö/päeva vaade</h3><div class="form-row seg">' +
       seg('themeMode', [['time', 'Kellaaja järgi'], ['light', 'Ruumi valguse järgi'], ['day', 'Alati päev'], ['night', 'Alati öö']], s.themeMode) + '</div>' +
-      '<div class="form-row"><label>Öö algab / lõpeb</label><input type="time" id="nf" value="' + s.nightFrom + '"> &nbsp; <input type="time" id="nt" value="' + s.nightTo + '"></div>' +
+      '<div class="form-row"><label>Öö algab / lõpeb</label>' + timePicker('nf', s.nightFrom) + '<span class="gap">–</span>' + timePicker('nt', s.nightTo) + '</div>' +
       '<div class="form-row"><label>Valguse lävi (öö kui tumedam)</label><input type="range" id="lt" min="0" max="255" value="' + s.lightThreshold + '"><span class="val" id="ltv">' + s.lightThreshold + '</span></div>' +
       '<div class="form-row"><label>Praegune ruumi valgus</label><span class="val" id="lnow">' + lightText() + '</span>' +
       '<button data-a="measure" style="height:48px;padding:0 16px;margin-left:10px">Mõõda → lävi</button></div>';
@@ -717,7 +759,8 @@
       el.addEventListener('change', function () { s[key] = num ? +el.value : el.value; save(); applyTheme(); });
       el.addEventListener('input', function () { var v = d.querySelector('#' + id + 'v'); if (v) v.textContent = el.value; });
     }
-    bind('nf', 'nightFrom'); bind('nt', 'nightTo'); bind('lt', 'lightThreshold', true);
+    on(d, '#nf select, #nt select', 'change', function () { s.nightFrom = readTime(d, 'nf'); s.nightTo = readTime(d, 'nt'); save(); applyTheme(); });
+    bind('lt', 'lightThreshold', true);
     bind('sens', 'sensitivity', true); bind('slp', 'sleepSec', true); bind('hs', 'halfSplit', true); bind('pin', 'pin');
     on(d, '[data-a=measure]', 'click', function () {
       if (cam.light < 0) { alert('Kaamera ei tööta – valgust ei saa mõõta.'); return; }
