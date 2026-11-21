@@ -5,6 +5,7 @@
   --yellow: #f2c230; --yellow-fg: #3a2e00;
   --red: #d33a2c; --red-fg: #ffffff;
   --btn: #e2e7ec; --btn-fg: #1f2933; --accent: #2f6fd6;
+  --grey: #8a939c; --grey-fg: #ffffff;
 }
 body.night {
   --bg: #0d1114; --fg: #c9d1d9; --panel: #161c21; --muted: #7d8790; --line: #2a333b;
@@ -12,6 +13,7 @@ body.night {
   --yellow: #8a6d12; --yellow-fg: #fff3c4;
   --red: #7d241c; --red-fg: #ffdcd8;
   --btn: #232b32; --btn-fg: #c9d1d9; --accent: #4f86de;
+  --grey: #4a5259; --grey-fg: #d6dbe0;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; }
@@ -49,6 +51,11 @@ button:disabled { opacity: .35; }
 .tile.cols4 { width: calc(25% - 16px); }
 .tile.yellow { background: var(--yellow); color: var(--yellow-fg); }
 .tile.red { background: var(--red); color: var(--red-fg); }
+.tile.grey { background: var(--grey); color: var(--grey-fg); }
+.tile .tire { position: absolute; top: 12px; left: 14px; width: 1.3em; height: 1.3em; }
+.tile .tire svg { width: 100%; height: 100%; display: block; }
+button.svc, .days button.svc { background: var(--grey); color: var(--grey-fg); }
+.seg.tires button { height: 44px; padding: 0 12px; margin-left: 6px; font-size: 16px; }
 .tile { overflow: hidden; }
 .tile .name { font-size: 1em; font-weight: 700; line-height: 1.1; word-break: break-word; }
 .tile .who { font-size: .75em; margin-top: 10px; font-weight: 600; }
@@ -89,7 +96,8 @@ button:disabled { opacity: .35; }
   margin: 18px -22px -22px; padding: 12px 22px 22px; border-top: 1px solid var(--line); }
 .actions { display: flex; justify-content: flex-end; flex-wrap: wrap; margin-top: 18px; }
 .actions button { margin-left: 10px; margin-top: 6px; padding: 0 26px; height: 64px; font-size: 22px; font-weight: 600; }
-.actions .left { margin-right: auto; margin-left: 0; }
+.actions .left { margin-left: 0; margin-right: 10px; }
+.actions .left + :not(.left) { margin-left: auto; }
 button.primary { background: var(--accent); color: #fff; }
 button.danger { background: var(--red); color: var(--red-fg); }
 button.warn { background: var(--yellow); color: var(--yellow-fg); }

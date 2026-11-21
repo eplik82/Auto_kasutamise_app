@@ -108,8 +108,12 @@ inimeste nimekiri, poolpäevade kellaajad (eeldus: hommik 00–12, õhtu 12–24
 | # | Kuupäev | Ülesanne | Staatus |
 |---|---------|----------|---------|
 | 1 | 2026-11-21 | Projekt loodud | tehtud |
-| 2 | 2026-11-21 | Pealeht: sõidukite ruudustik, klikk → täisekraani nimevalik → ruut punaseks + nimi | tehtud v0.1.0 (testimisel) |
-| 3 | 2026-11-21 | Broneerimine; 1 päev enne algust ruut kollaseks | tehtud v0.1.0 (testimisel) |
-| 4 | 2026-11-21 | Tagastamisel küsimus ees/taga parklas; ruudule täht E või T | tehtud v0.1.0 (testimisel) |
-| 5 | 2026-11-21 | Tagastamisel ikoonid "klaasipesuvedelik otsas", "kütust vähe" | tehtud v0.1.0 (testimisel) |
-| 6 | 2026-11-21 | Öö/päeva vaade (kellaaeg / ruumi valgus kaameraga); esikaamera liikumisandurina (ekraani uinumine/ärkamine); toetus vanadele seadmetele | tehtud v0.1.0 (testimisel) |
+| 2 | 2026-11-21 | Pealeht: sõidukite ruudustik, klikk → täisekraani nimevalik → ruut punaseks + nimi | tehtud v0.1.x |
+| 3 | 2026-11-21 | Broneerimine; 1 päev enne algust ruut kollaseks | tehtud v0.1.x |
+| 4 | 2026-11-21 | Tagastamisel küsimus ees/taga parklas; ruudule täht E või T | tehtud v0.1.x |
+| 5 | 2026-11-21 | Tagastamisel ikoonid "klaasipesuvedelik otsas", "kütust vähe" | tehtud v0.1.x |
+| 6 | 2026-11-21 | Öö/päeva vaade (kellaaeg / ruumi valgus kaameraga); esikaamera liikumisandurina (ekraani uinumine/ärkamine); toetus vanadele seadmetele | tehtud v0.1.x |
+| 7 | 2026-11-21 | Testimine 8 autoga / 20 nimega, täisekraan, armatuurlaua ikoonid | tehtud v0.1.4 |
+| 8 | 2026-11-21 | Seadetes ruudustik 3/4 tulpa (+ automaatne) | tehtud v0.2.0 |
+| 9 | 2026-11-21 | Hoolduse nupp broneeringu kõrval, hoolduse ajal ruut hall (poolpäeva kaupa, "Lõpeta hooldus") | tehtud v0.2.0 |
+| 10 | 2026-11-21 | Seadetes sõidukile Suverehvid/Talverehvid; talverehvid → ❄ ruudu vasakul üleval | tehtud v0.2.0 |

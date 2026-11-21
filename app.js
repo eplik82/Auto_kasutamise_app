@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.1.4';
+  var VERSION = '0.2.0';
   var KEY = 'autoapp.v1';
   var DAY_MS = 24 * 3600 * 1000;
   var WEEKDAYS = ['P', 'E', 'T', 'K', 'N', 'R', 'L'];
@@ -28,7 +28,8 @@
         nightFrom: '21:00', nightTo: '07:00',
         lightThreshold: 40,    // 0..255 keskmine heledus
         motion: true, sensitivity: 50, sleepMin: 2,
-        halfSplit: 12          // hommik 00–12, õhtu 12–24
+        halfSplit: 12,         // hommik 00–12, õhtu 12–24
+        cols: 'auto'           // ruudustik: auto | 3 | 4
       }
     };
   }
@@ -40,6 +41,7 @@
     var def = defaults();
     if (!d || !d.cars) return def;
     d.settings = Object.assign(def.settings, d.settings || {});
+    d.cars.forEach(function (c) { if (!c.tires) c.tires = 'S'; });
     d.people = d.people || []; d.bookings = d.bookings || []; d.history = d.history || [];
     return d;
   }
@@ -83,14 +85,27 @@
     return db.bookings.filter(function (b) { return b.carId === carId; })
       .sort(function (a, b) { return slotStart(a) - slotStart(b); });
   }
-  // Lähim broneering, mis algab ≤ 24 h pärast või juba kestab
+  function isService(b) { return b.type === 'service'; }
+  // Lähim broneering (mitte hooldus), mis algab ≤ 24 h pärast või juba kestab
   function soonBooking(carId) {
     var now = Date.now(), list = carBookings(carId);
     for (var i = 0; i < list.length; i++) {
+      if (isService(list[i])) continue;
       if (slotStart(list[i]) - now <= DAY_MS && slotEnd(list[i]) > now) return list[i];
     }
     return null;
   }
+  // Praegu kestev hooldus: { slots: [järjestikused poolpäevad], last } või null
+  function serviceNow(carId) {
+    var now = Date.now(), list = carBookings(carId).filter(isService), cur = null;
+    for (var i = 0; i < list.length; i++) {
+      if (!cur) { if (slotStart(list[i]) <= now && slotEnd(list[i]) > now) cur = [list[i]]; }
+      else if (slotStart(list[i]) === slotEnd(cur[cur.length - 1])) cur.push(list[i]);
+      else break;
+    }
+    return cur ? { slots: cur, last: cur[cur.length - 1] } : null;
+  }
+  function serviceLabel(sv) { return 'kuni ' + bookingLabel(sv.last); }
   function findBooking(carId, date, half) {
     for (var i = 0; i < db.bookings.length; i++) {
       var b = db.bookings[i];
@@ -113,6 +128,10 @@
       '<rect x="2.5" y="20" width="13" height="2" rx=".5"/>' +
       '<path d="M14 9 H15.5 A1.5 1.5 0 0 1 17 10.5 V16.5 A1.5 1.5 0 0 0 20 16.5 V8.5 L17.5 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   };
+  // lumehelves (talverehvid)
+  var SNOW_ARM = '<path d="M12 12 V2.5 M9.3 4.6 L12 7 L14.7 4.6"/>';
+  ICONS.snow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+    [0, 60, 120, 180, 240, 300].map(function (a) { return '<g transform="rotate(' + a + ' 12 12)">' + SNOW_ARM + '</g>'; }).join('') + '</svg>';
   var ICON_TITLE = { washer: 'Klaasipesuvedelik otsas', fuel: 'Kütust vähe' };
   function lamp(name) { return '<span class="lamp" title="' + ICON_TITLE[name] + '">' + ICONS[name] + '</span>'; }
   function lamps(o) { return (o.washer ? lamp('washer') : '') + (o.fuel ? lamp('fuel') : ''); }
@@ -125,14 +144,19 @@
     var n = db.cars.length, cls = '';
     if (!n) html = '<div class="empty">Sõidukeid pole. Lisa need seadetes ⚙.</div>';
     db.cars.forEach(function (c) {
-      var sb = soonBooking(c.id), state = c.user ? 'red' : (sb ? 'yellow' : 'green');
+      var sb = soonBooking(c.id), sv = serviceNow(c.id);
+      var state = c.user ? 'red' : (sv ? 'grey' : (sb ? 'yellow' : 'green'));
       var flags = lamps(c);
       html += '<div class="tile ' + state + ' ' + cls + '" data-id="' + c.id + '">';
       if (state !== 'red') html += '<div class="spot">' + c.spot + '</div>';
+      if (c.tires === 'W') html += '<div class="tire" title="Talverehvid">' + ICONS.snow + '</div>';
       html += '<div class="name">' + esc(c.name) + '</div>';
       if (state === 'red') {
         html += '<div class="who">' + esc(c.user) + '</div><div class="sub">alates ' + (sameDay(c.takenAt) ? hm(c.takenAt) : fullTime(c.takenAt)) + '</div>';
-        if (sb) html += '<div class="note">📅 ' + esc(sb.person) + ' ' + bookingLabel(sb) + '</div>';
+        if (sv) html += '<div class="note">🔧 hooldus ' + serviceLabel(sv) + '</div>';
+        else if (sb) html += '<div class="note">📅 ' + esc(sb.person) + ' ' + bookingLabel(sb) + '</div>';
+      } else if (state === 'grey') {
+        html += '<div class="who">🔧 Hooldus</div><div class="sub">' + serviceLabel(sv) + '</div>';
       } else if (state === 'yellow') {
         html += '<div class="who">📅 ' + esc(sb.person) + '</div><div class="sub">' + bookingLabel(sb) + '</div>';
       }
@@ -148,7 +172,8 @@
     if (!n) return;
     var W = grid.clientWidth - 16, H = grid.clientHeight - 16, M = 16; // grid padding 8 + tile margin 8
     var best = null;
-    for (var cols = 1; cols <= n; cols++) {
+    var fixed = +db.settings.cols || 0;
+    for (var cols = fixed || 1; cols <= (fixed || n); cols++) {
       var rows = Math.ceil(n / cols), w = W / cols - M, h = H / rows - M;
       if (w <= 0 || h <= 0) continue;
       var score = Math.min(w / 1.5, h); // eelistab ~3:2 ruute
@@ -207,9 +232,10 @@
 
   // Võtmine: nimede loetelu + Broneeri nupp + selle auto broneeringud
   function showTake(car) {
-    var sb = soonBooking(car.id);
+    var sb = soonBooking(car.id), sv = serviceNow(car.id);
     var h = '<h2>' + esc(car.name) + ' – kes võtab?</h2>';
-    if (sb) h += '<p class="info">📅 Broneeritud: <b>' + esc(sb.person) + '</b>, ' + bookingLabel(sb) + '</p>';
+    if (sv) h += '<p class="info">🔧 Hoolduses <b>' + serviceLabel(sv) + '</b> <button class="danger" data-a="endsvc" style="height:44px;padding:0 14px;margin-left:10px">Lõpeta hooldus</button></p>';
+    else if (sb) h += '<p class="info">📅 Broneeritud: <b>' + esc(sb.person) + '</b>, ' + bookingLabel(sb) + '</p>';
     else h += '<p class="info">Auto on parklas: <b>' + (car.spot === 'E' ? 'ees' : 'taga') + '</b></p>';
     if (!db.people.length) h += '<p class="info">Inimesi pole. Lisa need seadetes ⚙.</p>';
     h += '<div class="btngrid' + (db.people.length > 12 ? ' dense' : '') + '">';
@@ -221,17 +247,29 @@
     if (list.length) {
       h += '<h3>Broneeringud</h3><ul class="list">';
       list.forEach(function (b) {
-        h += '<li><span class="grow">' + esc(b.person) + ' – ' + bookingLabel(b) + '</span><button data-del="' + b.id + '" class="danger">Tühista</button></li>';
+        h += '<li><span class="grow">' + (isService(b) ? '🔧 Hooldus' : esc(b.person)) + ' – ' + bookingLabel(b) + '</span><button data-del="' + b.id + '" class="danger">Tühista</button></li>';
       });
       h += '</ul>';
     }
-    h += '<div class="actions"><button class="left warn" data-a="book">📅 Broneeri</button><button data-a="close">Sulge</button></div>';
+    h += '<div class="actions"><button class="left warn" data-a="book">📅 Broneeri</button>' +
+      '<button class="left svc" data-a="svc">🔧 Hooldus</button><button data-a="close">Sulge</button></div>';
     var d = openDialog(h);
     on(d, '[data-a=close]', 'click', closeDialog);
     on(d, '[data-a=book]', 'click', function () { showBookPerson(car); });
+    on(d, '[data-a=svc]', 'click', function () { showBookSlots(car, null); });
+    on(d, '[data-a=endsvc]', 'click', function () {
+      confirmBox('Lõpetan hoolduse – auto on jälle kasutatav?', 'Lõpeta', function () {
+        var ids = sv.slots.map(function (b) { return b.id; });
+        db.bookings = db.bookings.filter(function (b) { return ids.indexOf(b.id) < 0; });
+        save(); closeDialog();
+      }, 'danger');
+    });
     on(d, '[data-p]', 'click', function () {
       var person = db.people[+this.getAttribute('data-p')];
-      if (sb && sb.person !== person) {
+      if (sv) {
+        confirmBox('Auto on hoolduses ' + serviceLabel(sv) + '. Kas ' + esc(person) + ' võtab ikkagi?',
+          'Võtan', function () { take(car, person); }, 'warn');
+      } else if (sb && sb.person !== person) {
         confirmBox('Auto on broneeritud: ' + esc(sb.person) + ', ' + bookingLabel(sb) + '. Kas ' + esc(person) + ' võtab ikkagi?',
           'Võtan', function () { take(car, person); }, 'warn');
       } else take(car, person);
@@ -249,7 +287,7 @@
     // Võtja enda praegu kestvad broneeringud on kasutatud
     var now = Date.now();
     db.bookings = db.bookings.filter(function (b) {
-      return !(b.carId === car.id && b.person === person && slotStart(b) <= now);
+      return !(b.carId === car.id && !isService(b) && b.person === person && slotStart(b) <= now);
     });
     save(); closeDialog();
   }
@@ -298,20 +336,22 @@
   function showBookSlots(car, person) {
     var picked = {}; // 'YYYY-MM-DD|H' -> true
     var now = Date.now();
-    var h = '<h2>' + esc(car.name) + ' – ' + esc(person) + '</h2><p class="info">Vali poolpäevad (hommik 00–' +
-      pad(db.settings.halfSplit) + ', õhtu ' + pad(db.settings.halfSplit) + '–24). Kollane = juba broneeritud.</p><table class="days">';
+    var svc = !person;
+    var h = '<h2>' + esc(car.name) + ' – ' + (svc ? '🔧 hooldus' : esc(person)) + '</h2><p class="info">Vali ' + (svc ? 'hoolduse ' : '') +
+      'poolpäevad (hommik 00–' + pad(db.settings.halfSplit) + ', õhtu ' + pad(db.settings.halfSplit) +
+      '–24). Kollane = broneeritud, hall = hooldus.</p><table class="days">';
     for (var i = 0; i < BOOK_DAYS; i++) {
       var d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i);
       var ds = ymd(d);
       h += '<tr><td class="d">' + (i === 0 ? 'Täna ' : (i === 1 ? 'Homme ' : '')) + dayLabel(d) + '</td>';
       ['H', 'O'].forEach(function (half) {
         var ex = findBooking(car.id, ds, half), past = slotEnd({ date: ds, half: half }) <= now;
-        h += '<td><button data-k="' + ds + '|' + half + '"' + (ex ? ' class="taken" disabled' : '') + (past ? ' disabled' : '') + '>' +
-          (ex ? esc(ex.person) : (half === 'H' ? 'Hommik' : 'Õhtu')) + '</button></td>';
+        h += '<td><button data-k="' + ds + '|' + half + '"' + (ex ? ' class="' + (isService(ex) ? 'svc' : 'taken') + '" disabled' : '') + (past ? ' disabled' : '') + '>' +
+          (ex ? (isService(ex) ? '🔧 Hooldus' : esc(ex.person)) : (half === 'H' ? 'Hommik' : 'Õhtu')) + '</button></td>';
       });
       h += '</tr>';
     }
-    h += '</table><div class="actions"><button data-a="back">Tagasi</button><button class="primary" data-a="ok" disabled>Broneeri</button></div>';
+    h += '</table><div class="actions"><button data-a="back">Tagasi</button><button class="primary" data-a="ok" disabled>' + (svc ? 'Salvesta hooldus' : 'Broneeri') + '</button></div>';
     var dlg = openDialog(h);
     var okBtn = dlg.querySelector('[data-a=ok]');
     on(dlg, '[data-k]', 'click', function () {
@@ -320,11 +360,14 @@
       this.className = picked[k] ? 'sel' : '';
       okBtn.disabled = !Object.keys(picked).length;
     });
-    on(dlg, '[data-a=back]', 'click', function () { showBookPerson(car); });
+    on(dlg, '[data-a=back]', 'click', function () { if (svc) showTake(car); else showBookPerson(car); });
     on(dlg, '[data-a=ok]', 'click', function () {
       Object.keys(picked).forEach(function (k) {
         var p = k.split('|');
-        if (!findBooking(car.id, p[0], p[1])) db.bookings.push({ id: uid(), carId: car.id, person: person, date: p[0], half: p[1] });
+        if (findBooking(car.id, p[0], p[1])) return;
+        var rec = { id: uid(), carId: car.id, person: svc ? '' : person, date: p[0], half: p[1] };
+        if (svc) rec.type = 'service';
+        db.bookings.push(rec);
       });
       save(); showTake(car);
     });
@@ -373,6 +416,8 @@
     h += '<h3>Sõidukid</h3><ul class="list">';
     db.cars.forEach(function (c, i) {
       h += '<li><span class="grow">' + esc(c.name) + ' <small>(' + c.spot + ')</small></span>' +
+        '<span class="seg tires"><button data-tire="' + i + '" data-v="S"' + (c.tires !== 'W' ? ' class="sel"' : '') + '>☀ Suverehvid</button>' +
+        '<button data-tire="' + i + '" data-v="W"' + (c.tires === 'W' ? ' class="sel"' : '') + '>❄ Talverehvid</button></span>' +
         '<button data-up="' + i + '">▲</button><button data-ren="' + i + '">Muuda</button><button class="danger" data-delc="' + i + '">✕</button></li>';
     });
     h += '</ul><div class="actions"><button class="left primary" data-a="addcar">+ Lisa sõiduk</button></div>';
@@ -382,6 +427,8 @@
     });
     h += '</ul><div class="actions"><button class="left primary" data-a="addp">+ Lisa inimene</button></div>';
 
+    h += '<h3>Ruudustik</h3><div class="form-row seg">' +
+      seg('cols', [['auto', 'Automaatne'], ['3', '3 tulpa'], ['4', '4 tulpa']], String(s.cols)) + '</div>';
     h += '<h3>Öö/päeva vaade</h3><div class="form-row seg">' +
       seg('themeMode', [['time', 'Kellaaja järgi'], ['light', 'Ruumi valguse järgi'], ['day', 'Alati päev'], ['night', 'Alati öö']], s.themeMode) + '</div>' +
       '<div class="form-row"><label>Öö algab / lõpeb</label><input type="time" id="nf" value="' + s.nightFrom + '"> &nbsp; <input type="time" id="nt" value="' + s.nightTo + '"></div>' +
@@ -410,12 +457,15 @@
     on(d, '[data-a=addcar]', 'click', function () {
       var n = prompt('Sõiduki nimi:'); if (!n || !n.trim()) return;
       var sp = confirm('Kas auto seisab EES parklas? (OK = ees, Loobu = taga)') ? 'E' : 'T';
-      db.cars.push({ id: uid(), name: n.trim(), spot: sp, washer: false, fuel: false, user: null, takenAt: 0 });
+      db.cars.push({ id: uid(), name: n.trim(), spot: sp, tires: 'S', washer: false, fuel: false, user: null, takenAt: 0 });
       save(); showSettings();
     });
     on(d, '[data-ren]', 'click', function () {
       var c = db.cars[+this.getAttribute('data-ren')], n = prompt('Uus nimi:', c.name);
       if (n && n.trim()) { c.name = n.trim(); save(); showSettings(); }
+    });
+    on(d, '[data-tire]', 'click', function () {
+      db.cars[+this.getAttribute('data-tire')].tires = this.getAttribute('data-v'); save(); showSettings();
     });
     on(d, '[data-up]', 'click', function () { moveUp(db.cars, +this.getAttribute('data-up')); save(); showSettings(); });
     on(d, '[data-delc]', 'click', function () {
