@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.2.0';
+  var VERSION = '0.2.2';
   var KEY = 'autoapp.v1';
   var DAY_MS = 24 * 3600 * 1000;
   var WEEKDAYS = ['P', 'E', 'T', 'K', 'N', 'R', 'L'];
@@ -29,7 +29,8 @@
         lightThreshold: 40,    // 0..255 keskmine heledus
         motion: true, sensitivity: 50, sleepMin: 2,
         halfSplit: 12,         // hommik 00–12, õhtu 12–24
-        cols: 'auto'           // ruudustik: auto | 3 | 4
+        cols: 'auto',          // ruudustik: auto | 3 | 4
+        fullscreen: true       // täisekraan esimesel puudutusel (brauseris, nt Samsung Internet)
       }
     };
   }
@@ -429,6 +430,8 @@
 
     h += '<h3>Ruudustik</h3><div class="form-row seg">' +
       seg('cols', [['auto', 'Automaatne'], ['3', '3 tulpa'], ['4', '4 tulpa']], String(s.cols)) + '</div>';
+    h += '<h3>Täisekraan</h3><div class="form-row seg">' +
+      seg('fullscreen', [['1', 'Puudutusel täisekraan'], ['0', 'Väljas']], s.fullscreen ? '1' : '0') + '</div>';
     h += '<h3>Öö/päeva vaade</h3><div class="form-row seg">' +
       seg('themeMode', [['time', 'Kellaaja järgi'], ['light', 'Ruumi valguse järgi'], ['day', 'Alati päev'], ['night', 'Alati öö']], s.themeMode) + '</div>' +
       '<div class="form-row"><label>Öö algab / lõpeb</label><input type="time" id="nf" value="' + s.nightFrom + '"> &nbsp; <input type="time" id="nt" value="' + s.nightTo + '"></div>' +
@@ -494,7 +497,7 @@
     });
     on(d, '[data-seg]', 'click', function () {
       var k = this.getAttribute('data-seg'), v = this.getAttribute('data-v');
-      s[k] = k === 'motion' ? v === '1' : v; save();
+      s[k] = (k === 'motion' || k === 'fullscreen') ? v === '1' : v; save();
       var sib = this.parentNode.querySelectorAll('[data-seg=' + k + ']');
       for (var i = 0; i < sib.length; i++) sib[i].className = sib[i] === this ? 'sel' : '';
       applyTheme(); cam.apply();
@@ -639,6 +642,55 @@
     if (!overlay.classList.contains('hidden')) return;
     if (Date.now() - lastActivity > db.settings.sleepMin * 60000) sleepEl.classList.remove('hidden');
   }
+
+  // ---------- Täisekraan (Fullscreen API) ----------
+  // Paigaldatud appis (display-mode fullscreen) pole vaja. Brauseris tohib täisekraani küsida
+  // ainult kasutaja puudutuse ajal, seega proovime igal puudutusel, kuni see õnnestub.
+  var docEl = document.documentElement;
+  function isFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function fsSupported() { return !!(docEl.requestFullscreen || docEl.webkitRequestFullscreen); }
+  function appFullscreen() {
+    return window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches;
+  }
+  function enterFs() {
+    if (isFs() || !fsSupported()) return;
+    try {
+      var r = docEl.requestFullscreen ? docEl.requestFullscreen({ navigationUI: 'hide' }) : docEl.webkitRequestFullscreen();
+      if (r && r.catch) r.catch(function () {});
+    } catch (e) {}
+  }
+  function exitFs() {
+    try { if (document.exitFullscreen) document.exitFullscreen(); else if (document.webkitExitFullscreen) document.webkitExitFullscreen(); } catch (e) {}
+  }
+  // Puudutus, mis lülitab täisekraani sisse, ei tee muud (ei ava kogemata auto akent)
+  var swallowClick = 0;
+  function autoFs(e) {
+    if (e.type === 'click' && Date.now() - swallowClick < 800) {
+      swallowClick = 0; e.stopPropagation(); e.preventDefault(); return;
+    }
+    if (!db.settings.fullscreen || appFullscreen() || isFs() || !fsSupported()) return;
+    if (e.target && e.target.closest && e.target.closest('#btnFs')) return;
+    enterFs();
+    if (e.type === 'touchend') swallowClick = Date.now();
+    else { e.stopPropagation(); e.preventDefault(); }
+  }
+  ['click', 'touchend'].forEach(function (ev) { document.addEventListener(ev, autoFs, true); });
+  var FS_ICON = {
+    enter: '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
+    exit: '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>'
+  };
+  var fsBtn = document.getElementById('btnFs');
+  function updFsBtn() {
+    fsBtn.style.display = (fsSupported() && !appFullscreen()) ? '' : 'none';
+    fsBtn.innerHTML = isFs() ? FS_ICON.exit : FS_ICON.enter;
+  }
+  fsBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (isFs()) { db.settings.fullscreen = false; save(); exitFs(); } else { db.settings.fullscreen = true; save(); enterFs(); }
+  });
+  document.addEventListener('fullscreenchange', function () { updFsBtn(); setTimeout(fitTiles, 200); });
+  document.addEventListener('webkitfullscreenchange', function () { updFsBtn(); setTimeout(fitTiles, 200); });
+  updFsBtn();
 
   // ---------- Ekraan ärkvel ----------
   var wakeLock = null;

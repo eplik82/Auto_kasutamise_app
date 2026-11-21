@@ -12,6 +12,7 @@ Spetsifikatsioon: [`LÄHTEÜLESANNE.md`](LÄHTEÜLESANNE.md). Versioon: 0.2.0.
 - **🔧 Hooldus** (nimede aknas) → hoolduse poolpäevad, hoolduse ajal ruut hall.
 - **❄** ruudu vasakul üleval = talverehvid (⚙ → sõiduki juures Suverehvid/Talverehvid).
 - **📅 Broneeri** (nimede aknas) → nimi → poolpäevad (hommik/õhtu), kuni 21 päeva ette.
+- **Täisekraan:** brauseris (nt Samsung Internet) lülitub esimesel puudutusel täisekraanile; nupp ülal paremal lülitab sisse/välja (⚙ → Täisekraan).
 - **🕘** ajalugu, **☀/🌙** öö/päev, **⚙** seaded (sõidukid, inimesed, öörežiim, liikumisandur, PIN, varukoopia).
 
 ## Paigaldamine seadmesse
