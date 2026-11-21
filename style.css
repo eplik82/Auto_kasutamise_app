@@ -137,7 +137,11 @@ button.warn { background: var(--yellow); color: var(--yellow-fg); }
 .pin { font-size: 40px; letter-spacing: 12px; text-align: center; height: 56px; margin: 10px 0; }
 .keypad button { width: calc(33.333% - 12px); }
 
-#sleep { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: #000; z-index: 50; }
+/* Uinumine: sujuv üleminek mustaks ja tagasi */
+#sleep { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: #000; z-index: 50;
+  opacity: 0; -webkit-transition: opacity 1.5s ease; transition: opacity 1.5s ease; }
+#sleep.show { display: block; }
+#sleep.dark { opacity: 1; -webkit-transition: opacity 2.5s ease; transition: opacity 2.5s ease; }
 /* Kaamera peab DOM-is olema ja "nähtav", muidu iOS ei anna kaadreid */
 #cam { position: fixed; width: 2px; height: 2px; left: 0; bottom: 0; opacity: .01; pointer-events: none; }
 #camCanvas { display: none; }
@@ -152,3 +156,39 @@ button.warn { background: var(--yellow); color: var(--yellow-fg); }
   .form-row label { width: 100%; }
 }
 .tile .lamp { width: 1.4em; height: 1.4em; padding: .18em; border-radius: .3em; }
+
+/* Broneeringute nupp + punane ring */
+.iconbtn.wide { width: 104px; position: relative; }
+.badge { position: absolute; top: -6px; right: -6px; min-width: 28px; height: 28px; padding: 0 7px; border-radius: 14px;
+  background: #e0241b; color: #fff; font-size: 16px; font-weight: 800; line-height: 28px; text-align: center;
+  box-shadow: 0 0 0 2px var(--bg); }
+/* Kalender */
+.dialog.wide { max-width: none; width: 98%; }
+.calnav { display: flex; margin: 6px 0 10px; }
+.calnav button { height: 48px; padding: 0 16px; margin-right: 8px; font-size: 18px; }
+.calnav button.sel { background: var(--accent); color: #fff; }
+.calwrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.cal { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 14px; }
+.cal th, .cal td { border: 1px solid var(--line); text-align: center; padding: 0; }
+.cal th { font-weight: 600; color: var(--muted); padding: 4px 0; white-space: nowrap; overflow: hidden; }
+.cal th.car { width: 150px; text-align: left; padding-left: 8px; color: var(--fg); white-space: normal; }
+.cal th.today { color: var(--accent); background: rgba(47,111,214,.08); }
+.cal th.we { color: #c0392b; }
+.cal th.hh { font-size: 12px; }
+.cal td { height: 46px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; font-weight: 600; cursor: pointer; }
+.cal td.today { background: rgba(47,111,214,.08); }
+.cal td.bk { background: var(--yellow); color: var(--yellow-fg); }
+.cal td.svc { background: var(--grey); color: var(--grey-fg); }
+.cal td.past { background: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(127,127,127,.12) 4px, rgba(127,127,127,.12) 8px); cursor: default; }
+/* Seadete sakid */
+.tabs { display: flex; margin: -4px 0 14px; border-bottom: 2px solid var(--line); }
+.tabs button { flex: 1; height: 64px; font-size: 22px; font-weight: 700; border-radius: 12px 12px 0 0; margin-right: 6px; background: transparent; }
+.tabs button.sel { background: var(--accent); color: #fff; }
+button.bigadd { height: 60px; padding: 0 26px; font-size: 20px; font-weight: 600; margin: 0 0 6px; }
+/* Liikumise indikaator */
+.ind { display: inline-flex; align-items: center; font-size: 18px; }
+.ind i { width: 22px; height: 22px; border-radius: 50%; background: #8a939c; margin-right: 10px; display: inline-block;
+  -webkit-transition: background .2s, box-shadow .2s; transition: background .2s, box-shadow .2s; }
+.ind.on i { background: #2ecc40; box-shadow: 0 0 12px #2ecc40; }
+.ind.on span { color: #2e9d4f; font-weight: 700; }
+.ind.off i { background: #d33a2c; }

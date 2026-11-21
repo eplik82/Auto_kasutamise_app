@@ -3,7 +3,7 @@
 Offline-veebiapp (PWA) seinatahvlile: näitab, mis sõiduk on kasutuses ja mis parklas.
 Töötab Androidil ja iPadil, **ei vaja Apple ID / Google kontot ega internetti** (ainult paigaldamisel).
 
-Spetsifikatsioon: [`LÄHTEÜLESANNE.md`](LÄHTEÜLESANNE.md). Versioon: 0.2.0.
+Spetsifikatsioon: [`LÄHTEÜLESANNE.md`](LÄHTEÜLESANNE.md). Versioon: 0.3.0.
 
 ## Kasutamine
 - **Roheline ruut** – auto parklas (E = ees, T = taga). Klikk → vali nimi → auto võetud (punane).
@@ -13,6 +13,7 @@ Spetsifikatsioon: [`LÄHTEÜLESANNE.md`](LÄHTEÜLESANNE.md). Versioon: 0.2.0.
 - **❄** ruudu vasakul üleval = talverehvid (⚙ → sõiduki juures Suverehvid/Talverehvid).
 - **📅 Broneeri** (nimede aknas) → nimi → poolpäevad (hommik/õhtu), kuni 21 päeva ette.
 - **Täisekraan:** brauseris (nt Samsung Internet) lülitub esimesel puudutusel täisekraanile; nupp ülal paremal lülitab sisse/välja (⚙ → Täisekraan).
+- **📅 (punase ringiga)** broneeringute kalender: autod × päevad (hommik/õhtu), puuduta vaba lahtrit = broneeri, broneeringut = tühista.
 - **🕘** ajalugu, **☀/🌙** öö/päev, **⚙** seaded (sõidukid, inimesed, öörežiim, liikumisandur, PIN, varukoopia).
 
 ## Paigaldamine seadmesse

@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.2.2';
+  var VERSION = '0.3.0';
   var KEY = 'autoapp.v1';
   var DAY_MS = 24 * 3600 * 1000;
   var WEEKDAYS = ['P', 'E', 'T', 'K', 'N', 'R', 'L'];
@@ -27,9 +27,10 @@
         themeMode: 'time',     // time | light | day | night
         nightFrom: '21:00', nightTo: '07:00',
         lightThreshold: 40,    // 0..255 keskmine heledus
-        motion: true, sensitivity: 50, sleepMin: 2,
+        motion: true, sensitivity: 50, sleepSec: 120,
         halfSplit: 12,         // hommik 00–12, õhtu 12–24
         cols: 'auto',          // ruudustik: auto | 3 | 4
+        badge: true,           // punane ring broneeringute arvuga
         fullscreen: true       // täisekraan esimesel puudutusel (brauseris, nt Samsung Internet)
       }
     };
@@ -41,6 +42,7 @@
     try { d = JSON.parse(localStorage.getItem(KEY)); } catch (e) { d = null; }
     var def = defaults();
     if (!d || !d.cars) return def;
+    if (d.settings && d.settings.sleepMin && !d.settings.sleepSec) d.settings.sleepSec = d.settings.sleepMin * 60;
     d.settings = Object.assign(def.settings, d.settings || {});
     d.cars.forEach(function (c) { if (!c.tires) c.tires = 'S'; });
     d.people = d.people || []; d.bookings = d.bookings || []; d.history = d.history || [];
@@ -166,6 +168,7 @@
     });
     grid.innerHTML = html;
     fitTiles();
+    updBadge();
   }
   // Kõik ruudud mahuvad ekraanile ilma kerimiseta: vali veergude arv, mis annab suurimad ruudud
   function fitTiles() {
@@ -224,10 +227,10 @@
     var els = root.querySelectorAll(sel);
     for (var i = 0; i < els.length; i++) els[i].addEventListener(ev, fn);
   }
-  function confirmBox(text, okText, fn, okClass) {
+  function confirmBox(text, okText, fn, okClass, onNo) {
     var d = openDialog('<h2>' + text + '</h2><div class="actions"><button data-a="no">Ei</button>' +
       '<button data-a="yes" class="' + (okClass || 'primary') + '">' + okText + '</button></div>', true);
-    on(d, '[data-a=no]', 'click', closeDialog);
+    on(d, '[data-a=no]', 'click', onNo || closeDialog);
     on(d, '[data-a=yes]', 'click', function () { fn(); });
   }
 
@@ -374,6 +377,89 @@
     });
   }
 
+  // ---------- Broneeringute kalender ----------
+  var CAL_DAYS = 14;
+  function futureBookings() {
+    var now = Date.now();
+    return db.bookings.filter(function (b) { return !isService(b) && slotEnd(b) > now && carById(b.carId); })
+      .sort(function (a, b) { return slotStart(a) - slotStart(b); });
+  }
+  function updBadge() {
+    var el = document.getElementById('bookBadge'), n = futureBookings().length;
+    el.textContent = n > 99 ? '99+' : n;
+    el.style.display = (db.settings.badge && n > 0) ? '' : 'none';
+  }
+  function showCalendar(off) {
+    off = off || 0; purgeBookings();
+    var now = Date.now(), start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() + off);
+    var days = [];
+    for (var i = 0; i < CAL_DAYS; i++) { var dd = new Date(start); dd.setDate(start.getDate() + i); days.push(dd); }
+    var today = ymd(new Date());
+    var h = '<h2>Broneeringud</h2><div class="calnav"><button data-nav="-7">◀ Nädal tagasi</button>' +
+      '<button data-nav="0"' + (off === 0 ? ' class="sel"' : '') + '>Täna</button><button data-nav="7">Nädal edasi ▶</button></div>';
+    h += '<div class="calwrap"><table class="cal"><tr><th class="car"></th>';
+    days.forEach(function (d) {
+      h += '<th colspan="2" class="' + (ymd(d) === today ? 'today' : '') + (d.getDay() === 0 || d.getDay() === 6 ? ' we' : '') + '">' + dayLabel(d) + '</th>';
+    });
+    h += '</tr><tr><th class="car"></th>';
+    days.forEach(function (d) { var t = ymd(d) === today ? ' today' : ''; h += '<th class="hh' + t + '">H</th><th class="hh' + t + '">Õ</th>'; });
+    h += '</tr>';
+    db.cars.forEach(function (c, ci) {
+      h += '<tr><th class="car">' + esc(c.name) + '</th>';
+      days.forEach(function (d) {
+        var ds = ymd(d);
+        ['H', 'O'].forEach(function (half) {
+          var b = findBooking(c.id, ds, half), past = slotEnd({ date: ds, half: half }) <= now;
+          var cls = b ? (isService(b) ? 'svc' : 'bk') : (past ? 'past' : 'free');
+          if (ds === today) cls += ' today';
+          h += '<td class="' + cls + '" data-c="' + ci + '" data-k="' + ds + '|' + half + '">' +
+            (b ? (isService(b) ? '🔧' : esc(b.person)) : '') + '</td>';
+        });
+      });
+      h += '</tr>';
+    });
+    h += '</table></div><p class="info">Puuduta vaba lahtrit, et broneerida; broneeringut, et tühistada. Kollane = broneering, hall = hooldus.</p>';
+    var list = futureBookings();
+    h += '<h3>Lähimad broneeringud (' + list.length + ')</h3><ul class="list">';
+    list.slice(0, 40).forEach(function (b) {
+      h += '<li><span class="grow"><b>' + bookingLabel(b) + '</b> – ' + esc(carById(b.carId).name) + ' – ' + esc(b.person) +
+        '</span><button class="danger" data-del="' + b.id + '">Tühista</button></li>';
+    });
+    if (!list.length) h += '<li>Broneeringuid pole.</li>';
+    h += '</ul><div class="actions"><button class="primary" data-a="close">Sulge</button></div>';
+    var dlg = openDialog(h);
+    dlg.className += ' wide';
+    on(dlg, '[data-a=close]', 'click', closeDialog);
+    on(dlg, '[data-nav]', 'click', function () { var v = +this.getAttribute('data-nav'); showCalendar(v === 0 ? 0 : Math.max(0, off + v)); });
+    function cancel(b) {
+      var what = isService(b) ? 'hoolduse' : 'broneeringu (' + esc(b.person) + ')';
+      confirmBox('Tühistan ' + what + ': ' + esc(carById(b.carId).name) + ', ' + bookingLabel(b) + '?', 'Tühista', function () {
+        db.bookings = db.bookings.filter(function (x) { return x.id !== b.id; }); save(); showCalendar(off);
+      }, 'danger', function () { showCalendar(off); });
+    }
+    on(dlg, '[data-del]', 'click', function () {
+      var id = this.getAttribute('data-del');
+      for (var i = 0; i < db.bookings.length; i++) if (db.bookings[i].id === id) return cancel(db.bookings[i]);
+    });
+    on(dlg, 'td[data-k]', 'click', function () {
+      var car = db.cars[+this.getAttribute('data-c')], k = this.getAttribute('data-k').split('|');
+      var b = findBooking(car.id, k[0], k[1]);
+      if (b) return cancel(b);
+      if (/past/.test(this.className)) return;
+      // vaba lahter → vali nimi
+      var hh = '<h2>' + esc(car.name) + ' – ' + bookingLabel({ date: k[0], half: k[1] }) + '</h2><p class="info">Kes broneerib?</p>' +
+        '<div class="btngrid' + (db.people.length > 12 ? ' dense' : '') + '">';
+      db.people.forEach(function (p, i) { hh += '<button data-p="' + i + '">' + esc(p) + '</button>'; });
+      hh += '</div><div class="actions"><button data-a="back">Tagasi</button></div>';
+      var d2 = openDialog(hh);
+      on(d2, '[data-a=back]', 'click', function () { showCalendar(off); });
+      on(d2, '[data-p]', 'click', function () {
+        db.bookings.push({ id: uid(), carId: car.id, person: db.people[+this.getAttribute('data-p')], date: k[0], half: k[1] });
+        save(); showCalendar(off);
+      });
+    });
+  }
+
   // ---------- Ajalugu ----------
   function showHistory(filter) {
     var names = {};
@@ -411,27 +497,36 @@
     });
   }
 
-  function showSettings() {
-    var s = db.settings;
-    var h = '<h2>Seaded</h2>';
-    h += '<h3>Sõidukid</h3><ul class="list">';
+  var settingsTab = 'cars';
+  var SLEEP_OPTS = [[15, '15 s'], [30, '30 s'], [45, '45 s'], [60, '1 min'], [120, '2 min'], [300, '5 min'], [600, '10 min'], [900, '15 min'], [1800, '30 min'], [3600, '1 h']];
+  function showSettings(tab) {
+    if (tab) settingsTab = tab;
+    var s = db.settings, t = settingsTab;
+    var h = '<div class="tabs"><button data-tab="cars"' + (t === 'cars' ? ' class="sel"' : '') + '>🚗 Sõidukid</button>' +
+      '<button data-tab="people"' + (t === 'people' ? ' class="sel"' : '') + '>👤 Inimesed</button>' +
+      '<button data-tab="opts"' + (t === 'opts' ? ' class="sel"' : '') + '>⚙ Seaded</button></div>';
+    if (t === 'cars') {
+    h += '<p><button class="primary bigadd" data-a="addcar">+ Lisa sõiduk</button></p><ul class="list">';
     db.cars.forEach(function (c, i) {
       h += '<li><span class="grow">' + esc(c.name) + ' <small>(' + c.spot + ')</small></span>' +
         '<span class="seg tires"><button data-tire="' + i + '" data-v="S"' + (c.tires !== 'W' ? ' class="sel"' : '') + '>☀ Suverehvid</button>' +
         '<button data-tire="' + i + '" data-v="W"' + (c.tires === 'W' ? ' class="sel"' : '') + '>❄ Talverehvid</button></span>' +
         '<button data-up="' + i + '">▲</button><button data-ren="' + i + '">Muuda</button><button class="danger" data-delc="' + i + '">✕</button></li>';
     });
-    h += '</ul><div class="actions"><button class="left primary" data-a="addcar">+ Lisa sõiduk</button></div>';
-    h += '<h3>Inimesed</h3><ul class="list">';
+    h += '</ul>';
+    } else if (t === 'people') {
+    h += '<p><button class="primary bigadd" data-a="addp">+ Lisa inimene</button></p><ul class="list">';
     db.people.forEach(function (p, i) {
       h += '<li><span class="grow">' + esc(p) + '</span><button data-pup="' + i + '">▲</button><button data-pren="' + i + '">Muuda</button><button class="danger" data-delp="' + i + '">✕</button></li>';
     });
-    h += '</ul><div class="actions"><button class="left primary" data-a="addp">+ Lisa inimene</button></div>';
-
+    h += '</ul>';
+    } else {
     h += '<h3>Ruudustik</h3><div class="form-row seg">' +
       seg('cols', [['auto', 'Automaatne'], ['3', '3 tulpa'], ['4', '4 tulpa']], String(s.cols)) + '</div>';
     h += '<h3>Täisekraan</h3><div class="form-row seg">' +
       seg('fullscreen', [['1', 'Puudutusel täisekraan'], ['0', 'Väljas']], s.fullscreen ? '1' : '0') + '</div>';
+    h += '<h3>Broneeringute arv nupul (punane ring)</h3><div class="form-row seg">' +
+      seg('badge', [['1', 'Näita'], ['0', 'Peida']], s.badge ? '1' : '0') + '</div>';
     h += '<h3>Öö/päeva vaade</h3><div class="form-row seg">' +
       seg('themeMode', [['time', 'Kellaaja järgi'], ['light', 'Ruumi valguse järgi'], ['day', 'Alati päev'], ['night', 'Alati öö']], s.themeMode) + '</div>' +
       '<div class="form-row"><label>Öö algab / lõpeb</label><input type="time" id="nf" value="' + s.nightFrom + '"> &nbsp; <input type="time" id="nt" value="' + s.nightTo + '"></div>' +
@@ -442,9 +537,11 @@
     h += '<h3>Liikumisandur (esikaamera)</h3><div class="form-row seg">' +
       seg('motion', [['1', 'Sees'], ['0', 'Väljas']], s.motion ? '1' : '0') + '</div>' +
       '<div class="form-row"><label>Tundlikkus</label><input type="range" id="sens" min="1" max="100" value="' + s.sensitivity + '"><span class="val" id="sensv">' + s.sensitivity + '</span></div>' +
-      '<div class="form-row"><label>Ekraan mustaks pärast (min)</label><input type="number" id="slp" min="1" max="120" value="' + s.sleepMin + '"></div>' +
+      '<div class="form-row"><label>Ekraan mustaks pärast</label><select id="slp">' +
+      SLEEP_OPTS.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === +s.sleepSec ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
       '<div class="form-row"><label>Kaamera olek</label><span class="val" id="camst">' + cam.status + '</span>' +
-      '<button data-a="camstart" style="height:48px;padding:0 16px;margin-left:10px">Käivita kaamera</button></div>';
+      '<button data-a="camstart" style="height:48px;padding:0 16px;margin-left:10px">Käivita kaamera</button></div>' +
+      '<div class="form-row"><label>Liikumine</label><span class="ind" id="motInd"><i></i><span>–</span></span></div>';
 
     h += '<h3>Muu</h3>' +
       '<div class="form-row"><label>Hommiku/õhtu piir (kell)</label><input type="number" id="hs" min="6" max="18" value="' + s.halfSplit + '"></div>' +
@@ -452,9 +549,11 @@
       '<div class="form-row"><label>Varukoopia</label><button data-a="export" style="height:48px;padding:0 16px">Ekspordi</button>' +
       '<button data-a="import" style="height:48px;padding:0 16px;margin-left:8px">Impordi</button></div>' +
       '<p class="info">Versioon ' + VERSION + '. Andmed on ainult selles seadmes.</p>';
+    }
     h += '<div class="actions"><button class="primary" data-a="close">Valmis</button></div>';
 
     var d = openDialog(h);
+    on(d, '[data-tab]', 'click', function () { showSettings(this.getAttribute('data-tab')); });
     onClose = function () { applyTheme(); cam.apply(); };
     on(d, '[data-a=close]', 'click', closeDialog);
     on(d, '[data-a=addcar]', 'click', function () {
@@ -497,18 +596,18 @@
     });
     on(d, '[data-seg]', 'click', function () {
       var k = this.getAttribute('data-seg'), v = this.getAttribute('data-v');
-      s[k] = (k === 'motion' || k === 'fullscreen') ? v === '1' : v; save();
+      s[k] = (k === 'motion' || k === 'fullscreen' || k === 'badge') ? v === '1' : v; save(); updBadge();
       var sib = this.parentNode.querySelectorAll('[data-seg=' + k + ']');
       for (var i = 0; i < sib.length; i++) sib[i].className = sib[i] === this ? 'sel' : '';
       applyTheme(); cam.apply();
     });
     function bind(id, key, num) {
-      var el = d.querySelector('#' + id);
+      var el = d.querySelector('#' + id); if (!el) return;
       el.addEventListener('change', function () { s[key] = num ? +el.value : el.value; save(); applyTheme(); });
       el.addEventListener('input', function () { var v = d.querySelector('#' + id + 'v'); if (v) v.textContent = el.value; });
     }
     bind('nf', 'nightFrom'); bind('nt', 'nightTo'); bind('lt', 'lightThreshold', true);
-    bind('sens', 'sensitivity', true); bind('slp', 'sleepMin', true); bind('hs', 'halfSplit', true); bind('pin', 'pin');
+    bind('sens', 'sensitivity', true); bind('slp', 'sleepSec', true); bind('hs', 'halfSplit', true); bind('pin', 'pin');
     on(d, '[data-a=measure]', 'click', function () {
       if (cam.light < 0) { alert('Kaamera ei tööta – valgust ei saa mõõta.'); return; }
       s.lightThreshold = Math.round(cam.light); save();
@@ -521,7 +620,14 @@
       if (!document.body.contains(d)) { clearInterval(liveTimer); return; }
       var l = d.querySelector('#lnow'), c = d.querySelector('#camst');
       if (l) l.textContent = lightText(); if (c) c.textContent = cam.status;
-    }, 1000);
+      var mi = d.querySelector('#motInd');
+      if (mi) {
+        var act = cam.stream && Date.now() - cam.lastMotion < 1200;
+        mi.className = 'ind' + (act ? ' on' : '') + (cam.stream ? '' : ' off');
+        mi.lastChild.textContent = !cam.stream ? 'kaamera ei tööta' :
+          (act ? 'TUVASTAB liikumist' : 'liikumist pole') + '  (muutus ' + cam.md.toFixed(1) + ' / lävi ' + cam.thr.toFixed(1) + ')';
+      }
+    }, 250);
   }
   function seg(key, opts, cur) {
     return opts.map(function (o) { return '<button data-seg="' + key + '" data-v="' + o[0] + '"' + (o[0] === cur ? ' class="sel"' : '') + '>' + o[1] + '</button>'; }).join('');
@@ -577,7 +683,7 @@
 
   // ---------- Kaamera: liikumis- ja valgusandur ----------
   var cam = {
-    status: 'väljas', light: -1, stream: null, timer: null, prev: null,
+    status: 'väljas', light: -1, stream: null, timer: null, prev: null, lastMotion: 0, md: 0, thr: 0,
     video: document.getElementById('cam'), canvas: document.getElementById('camCanvas'),
     wanted: function () { return db.settings.motion || db.settings.themeMode === 'light'; },
     apply: function () { if (this.wanted()) this.start(false); else this.stop(); },
@@ -619,7 +725,8 @@
         // keskmine muutus pikslil, normaliseeritud heleduse järgi (automaatsäritus muudab kõike korraga)
         var md = diff / n;
         var thr = 2 + (100 - db.settings.sensitivity) * 0.25; // tundlikkus 100 → 2, 1 → ~27
-        if (md > thr && db.settings.motion) activity();
+        this.md = md; this.thr = thr;
+        if (md > thr) { this.lastMotion = Date.now(); if (db.settings.motion) activity(); }
       }
       this.prev = cur;
     }
@@ -628,10 +735,21 @@
   // ---------- Uinumine ----------
   var sleepEl = document.getElementById('sleep');
   var lastActivity = Date.now();
-  function activity() {
-    lastActivity = Date.now();
-    if (!sleepEl.classList.contains('hidden')) { sleepEl.classList.add('hidden'); render(); applyTheme(); requestWakeLock(); }
+  var sleeping = false, sleepTimer = null;
+  function goSleep() {
+    if (sleeping) return; sleeping = true;
+    clearTimeout(sleepTimer);
+    sleepEl.className = 'show';                       // nähtav, läbipaistev
+    setTimeout(function () { if (sleeping) sleepEl.className = 'show dark'; }, 30); // sujuvalt mustaks (CSS transition)
   }
+  function wake() {
+    if (!sleeping) return; sleeping = false;
+    render(); applyTheme(); requestWakeLock();
+    sleepEl.className = 'show';                       // sujuvalt läbipaistvaks
+    clearTimeout(sleepTimer);
+    sleepTimer = setTimeout(function () { if (!sleeping) sleepEl.className = 'hidden'; }, 1600);
+  }
+  function activity() { lastActivity = Date.now(); wake(); }
   ['touchstart', 'mousedown', 'keydown'].forEach(function (ev) {
     document.addEventListener(ev, activity, true);
   });
@@ -640,7 +758,7 @@
   function checkSleep() {
     if (!db.settings.motion || !cam.stream) return; // ilma andurita ei uinu (muidu ei ärkaks ise)
     if (!overlay.classList.contains('hidden')) return;
-    if (Date.now() - lastActivity > db.settings.sleepMin * 60000) sleepEl.classList.remove('hidden');
+    if (Date.now() - lastActivity > (+db.settings.sleepSec || 120) * 1000) goSleep();
   }
 
   // ---------- Täisekraan (Fullscreen API) ----------
@@ -663,7 +781,8 @@
     try { if (document.exitFullscreen) document.exitFullscreen(); else if (document.webkitExitFullscreen) document.webkitExitFullscreen(); } catch (e) {}
   }
   // Puudutus, mis lülitab täisekraani sisse, ei tee muud (ei ava kogemata auto akent)
-  var swallowClick = 0;
+  // NB! Neelame ainult esimese katse puudutuse – kui brauser täisekraani ei luba, ei tohi app kasutamatuks jääda.
+  var swallowClick = 0, fsTries = 0;
   function autoFs(e) {
     if (e.type === 'click' && Date.now() - swallowClick < 800) {
       swallowClick = 0; e.stopPropagation(); e.preventDefault(); return;
@@ -671,6 +790,7 @@
     if (!db.settings.fullscreen || appFullscreen() || isFs() || !fsSupported()) return;
     if (e.target && e.target.closest && e.target.closest('#btnFs')) return;
     enterFs();
+    if (fsTries++ > 0) return;
     if (e.type === 'touchend') swallowClick = Date.now();
     else { e.stopPropagation(); e.preventDefault(); }
   }
@@ -711,10 +831,11 @@
   }
   document.getElementById('btnSettings').addEventListener('click', function () { withPin(showSettings); });
   document.getElementById('btnHistory').addEventListener('click', function () { showHistory(''); });
+  document.getElementById('btnBook').addEventListener('click', function () { showCalendar(0); });
 
   setInterval(tick, 10000);
   setInterval(function () { if (overlay.classList.contains('hidden')) render(); applyTheme(); checkSleep(); }, 30000);
-  setInterval(checkSleep, 5000);
+  setInterval(checkSleep, 1000);
 
   tick(); applyTheme(); render(); requestWakeLock(); cam.apply();
 

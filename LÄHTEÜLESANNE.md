@@ -117,3 +117,19 @@ inimeste nimekiri, poolpäevade kellaajad (eeldus: hommik 00–12, õhtu 12–24
 | 8 | 2026-11-21 | Seadetes ruudustik 3/4 tulpa (+ automaatne) | tehtud v0.2.0 |
 | 9 | 2026-11-21 | Hoolduse nupp broneeringu kõrval, hoolduse ajal ruut hall (poolpäeva kaupa, "Lõpeta hooldus") | tehtud v0.2.0 |
 | 10 | 2026-11-21 | Seadetes sõidukile Suverehvid/Talverehvid; talverehvid → ❄ ruudu vasakul üleval | tehtud v0.2.0 |
+| 11 | 2026-11-21 | Broneeringute eraldi vaade: nupp "Vaata broneeringuid" + punane ring broneeringute arvuga; vajutus avab broneeringute kalendri | tehtud v0.3.0 |
+
+### Ülesanne 11 – minu arusaam (2026-11-21)
+- Ülaribal (kella rida, ajaloo 🕘 kõrval) nupp **📅 Broneeringud**, nurgas **punane ring numbriga** = tulevaste (ja praegu kestvate) broneeringute arv kõigil autodel. 0 korral ringi pole.
+- Vajutus avab täisekraani **kalendri**: read = sõidukid, veerud = päevad (täna + 13 päeva, nooltega ◀ ▶ edasi/tagasi), iga päeva lahter jagatud **hommik | õhtu**.
+  Kollane lahter = broneering (inimese nimi), hall = hooldus, tühi = vaba. Tänane veerg esile tõstetud.
+- Lahtri puudutus: broneeritud → info + "Tühista"; vaba → kohe broneerima (vali nimi → salvestub sellele poolpäevale).
+- Kalendri all nimekiri "Lähimad broneeringud" (kuupäev, auto, nimi).
+- Küsimused: kas ringi arv loeb ka hooldusi? Kas arv = kõik tulevased või ainult täna+homme? Kas nupp ülaribal sobib?
+- Vastused 2026-11-21: ringi arv ainult broneeringud (mitte hooldus), kõik tulevased, nupp ülaribal 2× laiem.
+| 12 | 2026-11-21 | Ringi näitamine seadetes sisse/välja | tehtud v0.3.0 |
+| 13 | 2026-11-21 | Kaamera oleku juures indikaator: tuvastab liikumist / ei (+ muutus/lävi) | tehtud v0.3.0 |
+| 14 | 2026-11-21 | Ekraan mustaks: ka alla 1 min (15/30/45 s … 1 h) | tehtud v0.3.0 |
+| 15 | 2026-11-21 | ⚙ menüü sakid: Sõidukid / Inimesed / Seaded | tehtud v0.3.0 |
+| 16 | 2026-11-21 | Liikumise tuvastuse järel pilt sujuvalt käima (fade), uinumine ka sujuv | tehtud v0.3.0 |
+| 17 | 2026-11-21 | Parandus: kui brauser täisekraani ei luba, ei neela app enam kõiki puudutusi | tehtud v0.3.0 |
