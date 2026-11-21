@@ -57,7 +57,7 @@ button:disabled { opacity: .35; }
 button.svc, .days button.svc { background: var(--grey); color: var(--grey-fg); }
 .seg.tires button { height: 44px; padding: 0 12px; margin-left: 6px; font-size: 16px; }
 .tile { overflow: hidden; }
-.tile .name { padding: 0 1.3em; font-size: 1em; font-weight: 700; line-height: 1.1; word-break: break-word; }
+.tile .name { padding: 0 .2em; font-size: 1em; font-weight: 700; line-height: 1.1; word-break: break-word; }
 .tile .who { font-size: .75em; margin-top: 10px; font-weight: 600; }
 .tile .sub { font-size: .5em; margin-top: 4px; opacity: .9; }
 .tile .spot {
@@ -195,3 +195,4 @@ button.bigadd { height: 60px; padding: 0 26px; font-size: 20px; font-weight: 600
 
 .tile .sub.cmt { font-style: italic; max-width: 90%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .form-row input[type=date] { font: inherit; font-size: 20px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+.tile { padding-top: 1.35em; }
