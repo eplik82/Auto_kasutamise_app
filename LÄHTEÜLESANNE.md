@@ -140,3 +140,4 @@ inimeste nimekiri, poolpäevade kellaajad (eeldus: hommik 00–12, õhtu 12–24
 | 22 | 2026-11-23 | iPadil ülariba ikoonid nuppudel paigast (☀ ⚙ tekstisümbolid + Safari nupu padding) → SVG ikoonid, flex-keskjoondus | tehtud v0.5.1 |
 - 2026-11-23: seade = **iPad mini 5 (2019), iPadOS 18.3**, ekraan 1024×768 punkti. Toetab kõike: PWA avakuvalt, offline (service worker), kaamera PWA-s, Wake Lock (iOS 16.4+), Fullscreen API. Vana-seadme varuvariandid pole selle jaoks vajalikud.
 | 23 | 2026-11-23 | Kalendris pikem broneering (järjestikused poolpäevad, sama inimene) ühe kirjena: üks lahter üle mitme poolpäeva, nimekirjas üks rida, tühistus korraga; ka pikk hooldus üks lahter; ring loeb broneeringuid, mitte poolpäevi | tehtud v0.5.2 |
+| 24 | 2026-11-23 | Kella ja kuupäeva näitamine seadetes sisse/välja | tehtud v0.5.3 |

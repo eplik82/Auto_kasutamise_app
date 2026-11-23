@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.5.2';
+  var VERSION = '0.5.3';
   var KEY = 'autoapp.v1';
   var DAY_MS = 24 * 3600 * 1000;
   var WEEKDAYS = ['P', 'E', 'T', 'K', 'N', 'R', 'L'];
@@ -31,6 +31,7 @@
         halfSplit: 12,         // hommik 00–12, õhtu 12–24
         cols: 'auto',          // ruudustik: auto | 3 | 4
         badge: true,           // punane ring broneeringute arvuga
+        showClock: true,       // kell ja kuupäev ülaribal
         fullscreen: true       // täisekraan esimesel puudutusel (brauseris, nt Samsung Internet)
       }
     };
@@ -719,6 +720,8 @@
       seg('cols', [['auto', 'Automaatne'], ['3', '3 tulpa'], ['4', '4 tulpa']], String(s.cols)) + '</div>';
     h += '<h3>Täisekraan</h3><div class="form-row seg">' +
       seg('fullscreen', [['1', 'Puudutusel täisekraan'], ['0', 'Väljas']], s.fullscreen ? '1' : '0') + '</div>';
+    h += '<h3>Kell ja kuupäev ülaribal</h3><div class="form-row seg">' +
+      seg('showClock', [['1', 'Näita'], ['0', 'Peida']], s.showClock ? '1' : '0') + '</div>';
     h += '<h3>Broneeringute arv nupul (punane ring)</h3><div class="form-row seg">' +
       seg('badge', [['1', 'Näita'], ['0', 'Peida']], s.badge ? '1' : '0') + '</div>';
     h += '<h3>Öö/päeva vaade</h3><div class="form-row seg">' +
@@ -792,7 +795,7 @@
     });
     on(d, '[data-seg]', 'click', function () {
       var k = this.getAttribute('data-seg'), v = this.getAttribute('data-v');
-      s[k] = (k === 'motion' || k === 'fullscreen' || k === 'badge') ? v === '1' : v; save(); updBadge();
+      s[k] = (k === 'motion' || k === 'fullscreen' || k === 'badge' || k === 'showClock') ? v === '1' : v; save(); updBadge(); tick();
       var sib = this.parentNode.querySelectorAll('[data-seg=' + k + ']');
       for (var i = 0; i < sib.length; i++) sib[i].className = sib[i] === this ? 'sel' : '';
       applyTheme(); cam.apply();
@@ -1046,7 +1049,9 @@
   })();
   function tick() {
     var d = new Date();
-    document.getElementById('clock').textContent = dayLabel(d) + '  ' + hm(d.getTime());
+    var el = document.getElementById('clock');
+    el.style.visibility = db.settings.showClock === false ? 'hidden' : '';
+    el.textContent = dayLabel(d) + '  ' + hm(d.getTime());
   }
   document.getElementById('btnSettings').addEventListener('click', function () { withPin(showSettings); });
   document.getElementById('btnHistory').addEventListener('click', function () { showHistory(''); });
