@@ -1,7 +1,7 @@
 /* Service worker – töötab ilma internetita.
  * Strateegia: võrk enne (3 s ooteaeg) → uuendab vahemälu; võrguta → vahemälust.
  * Nii jõuab uus versioon kohale kohe, kui seade on Wi-Fi-s, ja offline töötab alati. */
-var CACHE = 'autoapp-0.5.0';
+var CACHE = 'autoapp-0.5.1';
 var FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 var TIMEOUT = 3000;

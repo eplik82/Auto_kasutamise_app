@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.5.0';
+  var VERSION = '0.5.1';
   var KEY = 'autoapp.v1';
   var DAY_MS = 24 * 3600 * 1000;
   var WEEKDAYS = ['P', 'E', 'T', 'K', 'N', 'R', 'L'];
@@ -175,6 +175,15 @@
   var SNOW_ARM = '<path d="M12 12 V2.5 M9.3 4.6 L12 7 L14.7 4.6"/>';
   ICONS.snow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
     [0, 60, 120, 180, 240, 300].map(function (a) { return '<g transform="rotate(' + a + ' 12 12)">' + SNOW_ARM + '</g>'; }).join('') + '</svg>';
+  // Ülariba ikoonid SVG-na (emojid/tekstisümbolid joonduvad iOS-il valesti)
+  var SV = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">';
+  var TOP_ICONS = {
+    sun: SV + '<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>',
+    moon: SV + '<path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>',
+    cal: SV + '<rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="M7 13.5h2M11 13.5h2M15 13.5h2M7 17h2M11 17h2" stroke-width="2.4"/></svg>',
+    clock: SV + '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2.5"/></svg>',
+    gear: SV + '<circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>'
+  };
   var ICON_TITLE = { washer: 'Klaasipesuvedelik otsas', fuel: 'Kütust vähe' };
   function lamp(name) { return '<span class="lamp" title="' + ICON_TITLE[name] + '">' + ICONS[name] + '</span>'; }
   function lamps(o) { return (o.washer ? lamp('washer') : '') + (o.fuel ? lamp('fuel') : ''); }
@@ -837,7 +846,7 @@
     var m = db.settings.themeMode;
     var night = m === 'night' || (m === 'time' && isNightByTime()) || (m === 'light' && isNightByLight());
     document.body.className = night ? 'night' : 'day';
-    document.getElementById('btnTheme').textContent = night ? '☀' : '🌙';
+    document.getElementById('btnTheme').innerHTML = night ? TOP_ICONS.sun : TOP_ICONS.moon;
   }
   document.getElementById('btnTheme').addEventListener('click', function () {
     db.settings.themeMode = document.body.className === 'night' ? 'day' : 'night'; save(); applyTheme();
@@ -1003,6 +1012,12 @@
   });
 
   // ---------- Kell, nupud, tsükkel ----------
+  (function () {
+    var b = document.getElementById('btnBook'), badge = document.getElementById('bookBadge');
+    b.innerHTML = TOP_ICONS.cal; b.appendChild(badge);
+    document.getElementById('btnHistory').innerHTML = TOP_ICONS.clock;
+    document.getElementById('btnSettings').innerHTML = TOP_ICONS.gear;
+  })();
   function tick() {
     var d = new Date();
     document.getElementById('clock').textContent = dayLabel(d) + '  ' + hm(d.getTime());

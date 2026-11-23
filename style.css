@@ -34,7 +34,9 @@ button:disabled { opacity: .35; }
 }
 #clock { font-size: 26px; font-weight: 600; }
 .top-buttons button { margin-left: 8px; }
-.iconbtn { width: 52px; height: 48px; font-size: 26px; }
+.iconbtn { width: 52px; height: 48px; font-size: 26px; padding: 0; line-height: 1; text-align: center;
+  display: -webkit-inline-box; display: inline-flex; -webkit-box-align: center; align-items: center; -webkit-box-pack: center; justify-content: center; }
+.iconbtn svg { display: block; }
 
 #grid {
   display: -webkit-box; display: flex; flex-wrap: wrap; align-content: flex-start;
