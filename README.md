@@ -3,12 +3,12 @@
 Offline-veebiapp (PWA) seinatahvlile: näitab, mis sõiduk on kasutuses ja mis parklas.
 Töötab Androidil ja iPadil, **ei vaja Apple ID / Google kontot ega internetti** (ainult paigaldamisel).
 
-Spetsifikatsioon: [`LÄHTEÜLESANNE.md`](LÄHTEÜLESANNE.md). Versioon: 0.4.0.
+Spetsifikatsioon: [`LÄHTEÜLESANNE.md`](LÄHTEÜLESANNE.md). Versioon: 0.6.0.
 
 ## Kasutamine
 - **Roheline ruut** – auto parklas (E = ees, T = taga). Klikk → vali nimi → auto võetud (punane).
 - **Kollane ruut** – broneering algab 24 h jooksul või kestab. Võtta tohib (küsib kinnitust).
-- **Punane ruut** – kasutuses. Klikk → tagastamine: Ees/Taga + armatuurlaua ikoonid (klaasipesuvedelik otsas, kütust vähe).
+- **Punane ruut** – kasutuses. Klikk → tagastamine: parkla (⚙ → 🅿 Parklad, vaikimisi Ees/Taga) + armatuurlaua ikoonid (klaasipesuvedelik otsas, kütust vähe).
 - **🔧 Hooldus** (nimede aknas) → algus/lõpp (kuupäev + kell) + kommentaar. 24 h enne ruut kollane (🔧 hoiatus), hoolduse ajal hall.
 - **❄** ruudu vasakul üleval = talverehvid (⚙ → sõiduki juures Suverehvid/Talverehvid).
 - **📅 Broneeri** (nimede aknas) → nimi → poolpäevad (hommik/õhtu), kuni 21 päeva ette.

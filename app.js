@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.5.4';
+  var VERSION = '0.6.0';
   var KEY = 'autoapp.v1';
   var DAY_MS = 24 * 3600 * 1000;
   var WEEKDAYS = ['P', 'E', 'T', 'K', 'N', 'R', 'L'];
@@ -19,6 +19,7 @@
         { id: uid(), name: 'Auto 2', spot: 'E', washer: false, fuel: false, user: null, takenAt: 0 },
         { id: uid(), name: 'Auto 3', spot: 'T', washer: false, fuel: false, user: null, takenAt: 0 }
       ],
+      parkings: [{ code: 'E', name: 'Ees' }, { code: 'T', name: 'Taga' }],
       people: [],
       bookings: [], // {id, carId, person, date:'YYYY-MM-DD', half:'H'|'O'}
       history: [],  // {carName, person, takenAt, returnedAt, spot, washer, fuel}
@@ -49,6 +50,7 @@
     d.cars.forEach(function (c) { if (!c.tires) c.tires = 'S'; });
     d.people = d.people || []; d.bookings = d.bookings || []; d.history = d.history || [];
     d.services = d.services || [];
+    if (!d.parkings || !d.parkings.length) d.parkings = [{ code: 'E', name: 'Ees' }, { code: 'T', name: 'Taga' }];
     migrateServices(d);
     return d;
   }
@@ -190,6 +192,10 @@
   function lamp(name) { return '<span class="lamp" title="' + ICON_TITLE[name] + '">' + ICONS[name] + '</span>'; }
   function lamps(o) { return (o.washer ? lamp('washer') : '') + (o.fuel ? lamp('fuel') : ''); }
 
+  // ---------- Parklad ----------
+  function parking(code) { for (var i = 0; i < db.parkings.length; i++) if (db.parkings[i].code === code) return db.parkings[i]; return null; }
+  function parkingName(code) { var p = parking(code); return p ? p.name : code; }
+
   // ---------- Pealeht ----------
   var grid = document.getElementById('grid');
   function render() {
@@ -307,7 +313,7 @@
     else if (ss) h += '<p class="info">🔧 Hooldus <b>' + serviceRange(ss) + '</b>' + (ss.comment ? ' – ' + esc(ss.comment) : '') + '</p>';
     if (sv) {}
     else if (sb) h += '<p class="info">📅 Broneeritud: <b>' + esc(sb.person) + '</b>, ' + bookingLabel(sb) + '</p>';
-    else h += '<p class="info">Auto on parklas: <b>' + (car.spot === 'E' ? 'ees' : 'taga') + '</b></p>';
+    else h += '<p class="info">Auto on parklas: <b>' + esc(parkingName(car.spot)) + ' (' + esc(car.spot) + ')</b></p>';
     if (!db.people.length) h += '<p class="info">Inimesi pole. Lisa need seadetes ⚙.</p>';
     h += '<div class="btngrid' + (db.people.length > 12 ? ' dense' : '') + '">';
     db.people.forEach(function (p, i) {
@@ -376,8 +382,8 @@
     var spot = car.spot, washer = car.washer, fuel = car.fuel;
     var h = '<h2>' + esc(car.name) + ' – tagastamine</h2>' +
       '<p class="info">Võttis <b>' + esc(car.user) + '</b>, ' + fullTime(car.takenAt) + '</p>' +
-      '<h3>Kuhu parkisid?</h3><div class="btngrid two">' +
-      '<button data-s="E">Ees (E)</button><button data-s="T">Taga (T)</button></div>' +
+      '<h3>Kuhu parkisid?</h3><div class="btngrid' + (db.parkings.length <= 2 ? ' two' : (db.parkings.length <= 3 ? ' three' : '')) + '">' +
+      db.parkings.map(function (p) { return '<button data-s="' + esc(p.code) + '">' + esc(p.name) + ' (' + esc(p.code) + ')</button>'; }).join('') + '</div>' +
       '<h3>Märkused</h3><div class="btngrid two">' +
       '<button class="toggle" data-f="washer" aria-label="' + ICON_TITLE.washer + '">' + ICONS.washer + '</button>' +
       '<button class="toggle" data-f="fuel" aria-label="' + ICON_TITLE.fuel + '">' + ICONS.fuel + '</button></div>' +
@@ -700,14 +706,27 @@
     var s = db.settings, t = settingsTab;
     var h = '<div class="tabs"><button data-tab="cars"' + (t === 'cars' ? ' class="sel"' : '') + '>🚗 Sõidukid</button>' +
       '<button data-tab="people"' + (t === 'people' ? ' class="sel"' : '') + '>👤 Inimesed</button>' +
+      '<button data-tab="park"' + (t === 'park' ? ' class="sel"' : '') + '>🅿 Parklad</button>' +
       '<button data-tab="opts"' + (t === 'opts' ? ' class="sel"' : '') + '>⚙ Seaded</button></div>';
     if (t === 'cars') {
     h += '<p><button class="primary bigadd" data-a="addcar">+ Lisa sõiduk</button></p><ul class="list">';
     db.cars.forEach(function (c, i) {
-      h += '<li><span class="grow">' + esc(c.name) + ' <small>(' + c.spot + ')</small></span>' +
+      h += '<li><span class="grow">' + esc(c.name) + '</span>' +
+        '<select class="cspot" data-cspot="' + i + '" aria-label="Parkla">' + db.parkings.map(function (p) {
+          return '<option value="' + esc(p.code) + '"' + (p.code === c.spot ? ' selected' : '') + '>' + esc(p.code) + ' – ' + esc(p.name) + '</option>'; }).join('') +
+        (parking(c.spot) ? '' : '<option selected>' + esc(c.spot) + '</option>') + '</select>' +
         '<span class="seg tires"><button data-tire="' + i + '" data-v="S"' + (c.tires !== 'W' ? ' class="sel"' : '') + '>☀ Suverehvid</button>' +
         '<button data-tire="' + i + '" data-v="W"' + (c.tires === 'W' ? ' class="sel"' : '') + '>❄ Talverehvid</button></span>' +
         '<button data-up="' + i + '">▲</button><button data-ren="' + i + '">Muuda</button><button class="danger" data-delc="' + i + '">✕</button></li>';
+    });
+    h += '</ul>';
+    } else if (t === 'park') {
+    h += '<p><button class="primary bigadd" data-a="addpark">+ Lisa parkla</button></p>' +
+      '<p class="info">Tähis (1–3 märki) on näha ruudu nurgas, nimi tagastamise nuppudel.</p><ul class="list">';
+    db.parkings.forEach(function (p, i) {
+      var n = db.cars.filter(function (c) { return c.spot === p.code; }).length;
+      h += '<li><span class="pcode">' + esc(p.code) + '</span><span class="grow">' + esc(p.name) + ' <small>(' + n + ' autot)</small></span>' +
+        '<button data-kup="' + i + '">▲</button><button data-kren="' + i + '">Muuda</button><button class="danger" data-kdel="' + i + '">✕</button></li>';
     });
     h += '</ul>';
     } else if (t === 'people') {
@@ -758,9 +777,45 @@
     on(d, '[data-tab]', 'click', function () { showSettings(this.getAttribute('data-tab')); });
     onClose = function () { cam.testing = false; applyTheme(); cam.apply(); };
     on(d, '[data-a=close]', 'click', closeDialog);
+    on(d, 'select[data-cspot]', 'change', function () { db.cars[+this.getAttribute('data-cspot')].spot = this.value; save(); });
+    function askCode(name, cur) {
+      var c = prompt('Lühitähis ruudu nurka (1–3 märki):', cur || name.trim().charAt(0).toUpperCase());
+      if (c === null) return null;
+      c = c.trim().toUpperCase().slice(0, 3);
+      if (!c) return null;
+      if (c !== cur && parking(c)) { alert('Tähis "' + c + '" on juba kasutusel.'); return null; }
+      return c;
+    }
+    on(d, '[data-a=addpark]', 'click', function () {
+      var n = prompt('Parkla nimi (nt Hoov, Garaaž):'); if (!n || !n.trim()) return;
+      var c = askCode(n); if (!c) return;
+      db.parkings.push({ code: c, name: n.trim() }); save(); showSettings();
+    });
+    on(d, '[data-kren]', 'click', function () {
+      var p = db.parkings[+this.getAttribute('data-kren')];
+      var n = prompt('Parkla nimi:', p.name); if (n === null) return;
+      if (n.trim()) p.name = n.trim();
+      var c = askCode(p.name, p.code); if (!c) { save(); showSettings(); return; }
+      if (c !== p.code) {
+        var old = p.code;
+        db.cars.forEach(function (x) { if (x.spot === old) x.spot = c; });
+        p.code = c;
+      }
+      save(); showSettings();
+    });
+    on(d, '[data-kup]', 'click', function () { moveUp(db.parkings, +this.getAttribute('data-kup')); save(); showSettings(); });
+    on(d, '[data-kdel]', 'click', function () {
+      var i = +this.getAttribute('data-kdel'), p = db.parkings[i];
+      if (db.parkings.length <= 1) { alert('Vähemalt üks parkla peab jääma.'); return; }
+      var users = db.cars.filter(function (c) { return c.spot === p.code; });
+      var to = db.parkings[i === 0 ? 1 : 0];
+      if (!confirm('Kustutan parkla "' + p.name + '"?' + (users.length ? ' Selle ' + users.length + ' autot viiakse parklasse "' + to.name + '".' : ''))) return;
+      users.forEach(function (c) { c.spot = to.code; });
+      db.parkings.splice(i, 1); save(); showSettings();
+    });
     on(d, '[data-a=addcar]', 'click', function () {
       var n = prompt('Sõiduki nimi:'); if (!n || !n.trim()) return;
-      var sp = confirm('Kas auto seisab EES parklas? (OK = ees, Loobu = taga)') ? 'E' : 'T';
+      var sp = db.parkings[0].code; // parklat saab muuta nimekirjas
       db.cars.push({ id: uid(), name: n.trim(), spot: sp, tires: 'S', washer: false, fuel: false, user: null, takenAt: 0 });
       save(); showSettings();
     });
