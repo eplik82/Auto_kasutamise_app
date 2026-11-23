@@ -209,3 +209,7 @@ button.bigadd { height: 60px; padding: 0 26px; font-size: 20px; font-weight: 600
 /* vormiga aken ülaservas, et ekraaniklaviatuur seda ei nihutaks */
 #overlay.form { align-items: flex-start; padding-top: 2vh; }
 #overlay.form .dialog { max-height: 96%; }
+
+/* pikk broneering kalendris = üks lahter üle mitme poolpäeva */
+.cal td.long { text-align: left; padding-left: 10px; font-size: 15px; border-left: 4px solid rgba(0,0,0,.25); }
+.cal td.bk.long { box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }

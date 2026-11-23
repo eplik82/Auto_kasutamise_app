@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.5.1';
+  var VERSION = '0.5.2';
   var KEY = 'autoapp.v1';
   var DAY_MS = 24 * 3600 * 1000;
   var WEEKDAYS = ['P', 'E', 'T', 'K', 'N', 'R', 'L'];
@@ -323,8 +323,8 @@
     }
     if (list.length) {
       h += '<h3>Broneeringud</h3><ul class="list">';
-      list.forEach(function (b) {
-        h += '<li><span class="grow">' + esc(b.person) + ' – ' + bookingLabel(b) + '</span><button data-del="' + b.id + '" class="danger">Tühista</button></li>';
+      groupBookings(list).forEach(function (g) {
+        h += '<li><span class="grow">' + esc(g.person) + ' – ' + groupLabel(g) + '</span><button data-delg="' + groupIds(g) + '" class="danger">Tühista</button></li>';
       });
       h += '</ul>';
     }
@@ -357,13 +357,7 @@
           'Võtan', function () { take(car, person); }, 'warn');
       } else take(car, person);
     });
-    on(d, '[data-del]', 'click', function () {
-      var id = this.getAttribute('data-del');
-      confirmBox('Tühistan broneeringu?', 'Tühista', function () {
-        db.bookings = db.bookings.filter(function (b) { return b.id !== id; });
-        save(); showTake(car);
-      }, 'danger');
-    });
+    on(d, '[data-delg]', 'click', function () { cancelGroupBox(this.getAttribute('data-delg').split(','), function () { showTake(car); }); });
   }
   function take(car, person) {
     car.user = person; car.takenAt = Date.now();
@@ -545,9 +539,35 @@
       .sort(function (a, b) { return slotStart(a) - slotStart(b); });
   }
   function updBadge() {
-    var el = document.getElementById('bookBadge'), n = futureBookings().length;
+    var el = document.getElementById('bookBadge'), n = groupBookings(futureBookings()).length; // pikk broneering = 1
     el.textContent = n > 99 ? '99+' : n;
     el.style.display = (db.settings.badge && n > 0) ? '' : 'none';
+  }
+  // Järjestikused sama auto + sama inimese poolpäevad → üks broneering (grupp)
+  function groupBookings(list) {
+    var sorted = list.slice().sort(function (a, b) { return a.carId < b.carId ? -1 : a.carId > b.carId ? 1 : slotStart(a) - slotStart(b); });
+    var groups = [];
+    sorted.forEach(function (b) {
+      var g = groups[groups.length - 1];
+      if (g && g.carId === b.carId && g.person === b.person && slotEnd(g.items[g.items.length - 1]) === slotStart(b)) g.items.push(b);
+      else groups.push({ carId: b.carId, person: b.person, items: [b] });
+    });
+    return groups.sort(function (a, b) { return slotStart(a.items[0]) - slotStart(b.items[0]); });
+  }
+  function groupLabel(g) {
+    var f = g.items[0], l = g.items[g.items.length - 1];
+    if (g.items.length === 1) return bookingLabel(f);
+    if (f.date === l.date) return bookingLabel(f).replace(/ (hommik|õhtu)$/, '') + ' terve päev';
+    return bookingLabel(f) + ' – ' + bookingLabel(l);
+  }
+  function groupIds(g) { return g.items.map(function (b) { return b.id; }).join(','); }
+  function cancelGroupBox(ids, back) {
+    var items = db.bookings.filter(function (b) { return ids.indexOf(b.id) >= 0; });
+    if (!items.length) return back();
+    var g = { carId: items[0].carId, person: items[0].person, items: items.sort(function (a, b) { return slotStart(a) - slotStart(b); }) };
+    confirmBox('Tühistan broneeringu: ' + esc(g.person) + ', ' + esc(carById(g.carId).name) + ', ' + groupLabel(g) + '?', 'Tühista', function () {
+      db.bookings = db.bookings.filter(function (b) { return ids.indexOf(b.id) < 0; }); save(); back();
+    }, 'danger', back);
   }
   function showCalendar(off) {
     off = off || 0; purgeBookings();
@@ -566,46 +586,52 @@
     h += '</tr>';
     db.cars.forEach(function (c, ci) {
       h += '<tr><th class="car">' + esc(c.name) + '</th>';
+      // kõik poolpäevad järjest, siis sama inimese / sama hoolduse järjestikused liidetakse üheks lahtriks
+      var slots = [];
       days.forEach(function (d) {
         var ds = ymd(d);
         ['H', 'O'].forEach(function (half) {
-          var sl = { date: ds, half: half }, b = findBooking(c.id, ds, half), past = slotEnd(sl) <= now;
-          var so = serviceOverlap(c.id, slotStart(sl), slotEnd(sl));
-          var cls = b ? 'bk' : (so ? 'svc' : (past ? 'past' : 'free'));
-          if (ds === today) cls += ' today';
-          h += '<td class="' + cls + '" data-c="' + ci + '" data-k="' + ds + '|' + half + '"' + (so ? ' data-svc="' + so.id + '" title="' + esc(so.comment) + '"' : '') + '>' +
-            (b ? esc(b.person) : (so ? '🔧' : '')) + '</td>';
+          var sl = { date: ds, half: half }, b = findBooking(c.id, ds, half);
+          var so = b ? null : serviceOverlap(c.id, slotStart(sl), slotEnd(sl));
+          slots.push({ ds: ds, half: half, b: b, so: so, past: slotEnd(sl) <= now,
+            key: b ? 'b:' + b.person : (so ? 's:' + so.id : null) });
         });
       });
+      for (var i = 0; i < slots.length;) {
+        var x = slots[i], j = i + 1;
+        if (x.key) while (j < slots.length && slots[j].key === x.key) j++;
+        var run = slots.slice(i, j), n = run.length;
+        var cls = x.b ? 'bk' : (x.so ? 'svc' : (x.past ? 'past' : 'free'));
+        if (n === 1 && x.ds === today) cls += ' today';
+        if (n > 1) cls += ' long';
+        var attr = ' data-c="' + ci + '" data-k="' + x.ds + '|' + x.half + '"';
+        if (x.b) attr += ' data-ids="' + run.map(function (r) { return r.b.id; }).join(',') + '"';
+        if (x.so) attr += ' data-svc="' + x.so.id + '" title="' + esc(x.so.comment) + '"';
+        var txt = x.b ? esc(x.b.person) : (x.so ? '🔧' + (n > 2 && x.so.comment ? ' ' + esc(x.so.comment) : '') : '');
+        h += '<td class="' + cls + '"' + (n > 1 ? ' colspan="' + n + '"' : '') + attr + '>' + txt + '</td>';
+        i = j;
+      }
       h += '</tr>';
     });
     h += '</table></div><p class="info">Puuduta vaba lahtrit, et broneerida; broneeringut, et tühistada. Kollane = broneering, hall 🔧 = hooldus.</p>';
-    var list = futureBookings();
-    h += '<h3>Lähimad broneeringud (' + list.length + ')</h3><ul class="list">';
-    list.slice(0, 40).forEach(function (b) {
-      h += '<li><span class="grow"><b>' + bookingLabel(b) + '</b> – ' + esc(carById(b.carId).name) + ' – ' + esc(b.person) +
-        '</span><button class="danger" data-del="' + b.id + '">Tühista</button></li>';
+    var groups = groupBookings(futureBookings());
+    h += '<h3>Lähimad broneeringud (' + groups.length + ')</h3><ul class="list">';
+    groups.slice(0, 40).forEach(function (g) {
+      h += '<li><span class="grow"><b>' + groupLabel(g) + '</b> – ' + esc(carById(g.carId).name) + ' – ' + esc(g.person) +
+        '</span><button class="danger" data-delg="' + groupIds(g) + '">Tühista</button></li>';
     });
-    if (!list.length) h += '<li>Broneeringuid pole.</li>';
+    if (!groups.length) h += '<li>Broneeringuid pole.</li>';
     h += '</ul><div class="actions"><button class="primary" data-a="close">Sulge</button></div>';
     var dlg = openDialog(h);
     dlg.className += ' wide';
     on(dlg, '[data-a=close]', 'click', closeDialog);
     on(dlg, '[data-nav]', 'click', function () { var v = +this.getAttribute('data-nav'); showCalendar(v === 0 ? 0 : Math.max(0, off + v)); });
-    function cancel(b) {
-      var what = 'broneeringu (' + esc(b.person) + ')';
-      confirmBox('Tühistan ' + what + ': ' + esc(carById(b.carId).name) + ', ' + bookingLabel(b) + '?', 'Tühista', function () {
-        db.bookings = db.bookings.filter(function (x) { return x.id !== b.id; }); save(); showCalendar(off);
-      }, 'danger', function () { showCalendar(off); });
-    }
-    on(dlg, '[data-del]', 'click', function () {
-      var id = this.getAttribute('data-del');
-      for (var i = 0; i < db.bookings.length; i++) if (db.bookings[i].id === id) return cancel(db.bookings[i]);
-    });
+    var backCal = function () { showCalendar(off); };
+    on(dlg, '[data-delg]', 'click', function () { cancelGroupBox(this.getAttribute('data-delg').split(','), backCal); });
     on(dlg, 'td[data-k]', 'click', function () {
       var car = db.cars[+this.getAttribute('data-c')], k = this.getAttribute('data-k').split('|');
-      var b = findBooking(car.id, k[0], k[1]);
-      if (b) return cancel(b);
+      var ids = this.getAttribute('data-ids');
+      if (ids) return cancelGroupBox(ids.split(','), backCal);
       var svid = this.getAttribute('data-svc');
       if (svid) {
         var v = svcById(svid);
