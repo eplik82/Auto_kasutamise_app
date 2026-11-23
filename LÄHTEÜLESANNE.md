@@ -138,3 +138,4 @@ inimeste nimekiri, poolpäevade kellaajad (eeldus: hommik 00–12, õhtu 12–24
 | 20 | 2026-11-21 | Viga: hoolduse "Muuda" kommentaar ei salvestunud (klaviatuuri sulgumisel aken hüppas, "Salvesta" puudutus tabas tausta → aken sulgus). Parandus: vormiaknad ülaserva ankurdatud, taust ei sulge vormi, Enter salvestab | tehtud v0.4.2 |
 | 21 | 2026-11-21 | iPhone/iPad näitab kaamera ikooni pidevalt → kaamera töötab AINULT musta ekraani ajal (ärkamisel kohe välja); valguse järgi öövaade: lühimõõtmine iga 10 min; "Testi kaamerat" seadetes | tehtud v0.5.0 |
 | 22 | 2026-11-23 | iPadil ülariba ikoonid nuppudel paigast (☀ ⚙ tekstisümbolid + Safari nupu padding) → SVG ikoonid, flex-keskjoondus | tehtud v0.5.1 |
+- 2026-11-23: seade = **iPad mini 5 (2019), iPadOS 18.3**, ekraan 1024×768 punkti. Toetab kõike: PWA avakuvalt, offline (service worker), kaamera PWA-s, Wake Lock (iOS 16.4+), Fullscreen API. Vana-seadme varuvariandid pole selle jaoks vajalikud.
