@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.5.3';
+  var VERSION = '0.5.4';
   var KEY = 'autoapp.v1';
   var DAY_MS = 24 * 3600 * 1000;
   var WEEKDAYS = ['P', 'E', 'T', 'K', 'N', 'R', 'L'];
@@ -32,6 +32,7 @@
         cols: 'auto',          // ruudustik: auto | 3 | 4
         badge: true,           // punane ring broneeringute arvuga
         showClock: true,       // kell ja kuupäev ülaribal
+        camMode: 'auto',       // kaamera vaheajal: auto (iOS peata, muu sulge) | pause | close
         fullscreen: true       // täisekraan esimesel puudutusel (brauseris, nt Samsung Internet)
       }
     };
@@ -739,6 +740,9 @@
       '<div class="form-row"><label>Kaamera olek</label><span class="val" id="camst">' + cam.status + '</span>' +
       '<button data-a="camstart" style="height:48px;padding:0 16px;margin-left:10px">Testi kaamerat</button></div>' +
       '<p class="info">Kaamera töötab ainult siis, kui ekraan on must (ootab liikumist). Testimiseks töötab ta, kuni see aken on lahti.</p>' +
+      '<div class="form-row"><label>Kaamera vaheajal</label><span class="seg">' +
+      seg('camMode', [['auto', 'Automaatne'], ['pause', 'Peata (luba jääb)'], ['close', 'Sulge (tuli kustub)']], s.camMode || 'auto') + '</span></div>' +
+      '<p class="info">iPad küsib kaamera luba uuesti, kui kaamera suletakse – "Peata" hoiab loa alles. Kui peatatud kaamera märgutuli jääb põlema, vali "Sulge".</p>' +
       '<div class="form-row"><label>Liikumine</label><span class="ind" id="motInd"><i></i><span>–</span></span></div>';
 
     h += '<h3>Muu</h3>' +
@@ -822,9 +826,9 @@
       if (l) l.textContent = lightText(); if (c) c.textContent = cam.status;
       var mi = d.querySelector('#motInd');
       if (mi) {
-        var act = cam.stream && Date.now() - cam.lastMotion < 1200;
-        mi.className = 'ind' + (act ? ' on' : '') + (cam.stream ? '' : (cam.denied ? ' off' : ''));
-        mi.lastChild.textContent = !cam.stream ? (cam.denied ? 'kaamera keelatud – luba seadme seadetes' : 'ootab musta ekraani (vajuta "Testi kaamerat")') :
+        var act = cam.running() && Date.now() - cam.lastMotion < 1200;
+        mi.className = 'ind' + (act ? ' on' : '') + (cam.running() ? '' : (cam.denied ? ' off' : ''));
+        mi.lastChild.textContent = !cam.running() ? (cam.denied ? 'kaamera keelatud – luba seadme seadetes' : 'ootab musta ekraani (vajuta "Testi kaamerat")') :
           (act ? 'TUVASTAB liikumist' : 'liikumist pole') + '  (muutus ' + cam.md.toFixed(1) + ' / lävi ' + cam.thr.toFixed(1) + ')';
       }
     }, 250);
@@ -894,20 +898,34 @@
       return (sleeping && need) || this.testing || this.measuring;
     },
     apply: function () { if (this.wanted()) this.start(false); else this.stop(); },
+    // iOS avakuva-app küsib luba uuesti iga kord, kui kaamera päriselt suletakse (track.stop).
+    // Seepärast: pärast esimest luba hoiame ühenduse alles ja ainult PEATAME pildi (track.enabled=false) –
+    // brauser lülitab siis kaamera füüsiliselt välja (märgutuli kustub), aga luba jääb.
+    live: function () {
+      return this.stream && this.stream.getVideoTracks().some(function (t) { return t.readyState === 'live'; });
+    },
+    resume: function () {
+      var self = this;
+      this.stream.getVideoTracks().forEach(function (t) { t.enabled = true; });
+      var p = this.video.play(); if (p && p.catch) p.catch(function () {});
+      this.startedAt = Date.now(); this.prev = null; this.status = 'töötab';
+      if (!this.timer) this.timer = setInterval(function () { self.sample(); }, 500);
+    },
     start: function (userAsked) {
       var self = this;
-      if (this.stream || this.starting) return;
+      if (this.live()) { if (!this.timer || this.paused) { this.paused = false; this.resume(); } return; }
+      this.stream = null;
+      if (this.starting) return;
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { this.status = 'pole toetatud (vana seade?)'; return; }
       if (userAsked) this.denied = false;
       this.status = 'käivitub…'; this.starting = true;
       navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 160 }, height: { ideal: 120 } }, audio: false })
         .then(function (st) {
           self.starting = false;
-          if (!self.wanted() && !userAsked) { st.getTracks().forEach(function (t) { t.stop(); }); self.status = 'väljas'; return; }
-          self.stream = st; self.video.srcObject = st; self.startedAt = Date.now();
-          var p = self.video.play(); if (p && p.catch) p.catch(function () {});
-          self.status = 'töötab'; self.prev = null;
-          self.timer = setInterval(function () { self.sample(); }, 500);
+          self.stream = st; self.video.srcObject = st; self.paused = false;
+          st.getVideoTracks().forEach(function (t) { t.addEventListener('ended', function () { self.stream = null; }); });
+          self.resume();
+          if (!self.wanted() && !userAsked) self.stop();
         })
         .catch(function (e) {
           self.starting = false;
@@ -916,12 +934,21 @@
           if (userAsked) alert('Kaamerat ei saanud käivitada (' + (e && e.name) + '). Luba kaamera seadme seadetes.');
         });
     },
+    keepOpen: function () {
+      var m = db.settings.camMode;
+      if (m === 'pause') return true;
+      if (m === 'close') return false;
+      // iOS/iPadOS (ka iPad, mis teeskleb Maci) → peata, et luba ei küsitaks iga kord uuesti
+      return /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+    },
     stop: function () {
       if (this.timer) clearInterval(this.timer); this.timer = null;
-      if (this.stream) this.stream.getTracks().forEach(function (t) { t.stop(); });
-      // viimane valguse väärtus jääb alles (öövaade valguse järgi)
-      this.stream = null; this.status = this.denied ? this.status : 'väljas (käivitub mustal ekraanil)';
+      // viimane valguse väärtus jääb alles
+      if (this.stream && this.keepOpen()) { this.stream.getVideoTracks().forEach(function (t) { t.enabled = false; }); this.paused = true; }
+      else if (this.stream) { this.stream.getTracks().forEach(function (t) { t.stop(); }); this.stream = null; this.paused = false; }
+      if (!this.denied) this.status = this.stream ? 'peatatud (käivitub mustal ekraanil)' : 'väljas (käivitub mustal ekraanil)';
     },
+    running: function () { return !!(this.stream && this.timer && !this.paused); },
     sample: function () {
       var v = this.video; if (!v.videoWidth) return;
       var ctx = this.canvas.getContext('2d'), w = this.canvas.width, h = this.canvas.height;
@@ -1062,7 +1089,7 @@
   setInterval(checkSleep, 1000);
   // Öövaade ruumi valguse järgi: ärkvel olles lühike mõõtmine iga 10 min (≈4 s)
   setInterval(function () {
-    if (sleeping || db.settings.themeMode !== 'light' || !cam.supported() || cam.stream) return;
+    if (sleeping || db.settings.themeMode !== 'light' || !cam.supported() || cam.running()) return;
     cam.measuring = true; cam.apply();
     setTimeout(function () { cam.measuring = false; cam.apply(); applyTheme(); }, 4000);
   }, 600000);
